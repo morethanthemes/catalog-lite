@@ -1,0 +1,15 @@
+/**
+ * @file
+ * Styles for Catalog lite's infinite scroll pager.
+ */
+
+.pager[data-drupal-views-infinite-scroll-pager] {
+  margin: 20px 0;
+  padding: 0;
+  padding-top: 20px;
+  font-size: 0;
+  text-align: center;
+  border-top-width: 2px;
+  border-top-color: #e5e5e5;
+  border-top-style: solid;
+}

@@ -1,0 +1,115 @@
+/**
+ * @file
+ * Styles for Catalog lite's breadcrumbs.
+ */
+.breadcrumb {
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  position: relative;
+  -webkit-border-radius: 0;
+  -moz-border-radius: 0;
+  border-radius: 0;
+  background-color: #ebebeb;
+}
+.banner__section .block:first-child .breadcrumb {
+  padding-top: 75px;
+}
+.banner__section .block:first-child:last-child .breadcrumb {
+  padding: 40px 0;
+  margin: 0;
+}
+@media (max-width: 767px) {
+  .banner__section .block:first-child .breadcrumb {
+    padding-top: 35px;
+    font-size: 48px;
+  }
+}
+.region--light-typography .breadcrumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.container-fluid .breadcrumb {
+  margin-left: -15px;
+  margin-right: -15px;
+}
+.banner__section .breadcrumb,
+.background-image-block__section .breadcrumb {
+  background-color: transparent;
+  text-align: center;
+  margin-left: 0;
+  margin-right: 0;
+}
+.banner__section .breadcrumb .breadcrumb__item,
+.background-image-block__section .breadcrumb .breadcrumb__item {
+  font-size: 18px;
+}
+.background-image-block__section .breadcrumb {
+  margin-bottom: 30px;
+}
+.breadcrumb__items {
+  font-size: 0;
+  padding: 0;
+  margin: 0;
+}
+.breadcrumb__item {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  line-height: 1.75;
+  padding: 8px 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: #2c2c2c;
+}
+.breadcrumb__item a {
+  text-decoration: none;
+}
+.region--light-typography .breadcrumb__item {
+  color: #ffffff;
+}
+.region--light-typography .breadcrumb__item a {
+  color: rgba(255, 255, 255, 0.8);
+}
+.region--light-typography .breadcrumb__item a:hover {
+  color: #ffffff;
+}
+.breadcrumb__item .breadcrumb__item-separator {
+  display: inline-block;
+  padding-left: 2px;
+  font-size: 10px;
+  vertical-align: middle;
+  font-weight: 400;
+  width: 25px;
+}
+.breadcrumb__item:first-child .breadcrumb__item-separator {
+  display: none;
+}
+.container-fluid .breadcrumb .breadcrumb__items {
+  width: 100%;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+@media (min-width: 578px) {
+  .container-fluid .breadcrumb .breadcrumb__items {
+    width: 510px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+@media (min-width: 768px) {
+  .container-fluid .breadcrumb .breadcrumb__items {
+    width: 690px;
+  }
+}
+@media (min-width: 992px) {
+  .container-fluid .breadcrumb .breadcrumb__items {
+    width: 930px;
+  }
+}
+@media (min-width: 1200px) {
+  .container-fluid .breadcrumb .breadcrumb__items {
+    width: 1110px;
+  }
+}

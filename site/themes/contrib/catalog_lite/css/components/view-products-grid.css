@@ -1,0 +1,54 @@
+  /**
+ * @file
+ * Visual styles for Catalog lite's products grid views.
+ */
+.view-products-grid .views-row {
+  margin: 30px 0;
+  position: relative;
+}
+.headings-wide-spacing-enabled .view-products-grid .views-field-title h5 {
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+.view-products-grid .views-field-title h5 a:hover {
+  text-decoration: none;
+}
+.region--light-typography .view-products-grid .views-field-title h5 a,
+.region--light-typography .view-products-grid .views-field-title h5 a:hover {
+  color: #ffffff;
+  text-decoration: none;
+}
+.view-products-grid .views-field-field-mt-prd-body {
+  padding-bottom: 15px;
+}
+.view-products-grid .views-field-field-mt-prd-body p:last-child {
+  padding-bottom: 0;
+}
+
+/* overlay */
+.view-products-grid .views-row > .overlay-container {
+  position: absolute;
+  display: block;
+  overflow: hidden;
+  top: -15px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+}
+
+/* image with category */
+.view-products-grid .product-thumbnail-container {
+  position: relative;
+}
+.view-products-grid .views-field-field-mt-prd-categories a {
+  color: #ffffff;
+  padding: 5px 15px;
+  display: inline-block;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.view-products-grid .product-thumbnail-container .views-field-field-mt-prd-categories {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+}

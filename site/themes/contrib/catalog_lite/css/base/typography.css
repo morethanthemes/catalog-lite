@@ -1,0 +1,66 @@
+/**
+ * @file
+ * Font Families.
+ */
+
+/*body*/
+
+body.pff-32 {
+  font-family: 'Montserrat', Helvetica Neue, Arial, Sans-serif;
+}
+body.pff-51 {
+  font-family: 'IBM Plex Sans', Helvetica Neue, Arial, sans-serif;
+}
+
+/*headings*/
+
+.hff-32 h1,
+.hff-32 h2,
+.hff-32 h3,
+.hff-32 h4,
+.hff-32 h5,
+.hff-32 h6,
+.hff-32 .tp-caption__title,
+.hff-32 .tp-caption__subtitle,
+.hff-32 .field--name-field-mt-highlight-title,
+.sff-32 .site-name,
+.slff-32 .site-slogan,
+.hff-32 .nav-tab__title,
+.hff-32 .views-field-field-mt-price,
+.hff-32 a.button,
+.hff-32 .button > a,
+.hff-32 input[type="submit"],
+.hff-32 input[type="reset"],
+.hff-32 input[type="button"],
+.hff-32 .field--name-field-mt-prd-buy-link,
+.hff-32 .field--name-field-mt-srv-buy-link,
+.hff-32 .field--name-field-mt-highlight-link,
+.hff-32 .page-node-type-mt-product .page-title,
+.hff-32 .field__label {
+  font-family: 'Montserrat', Helvetica Neue, Arial, Sans-serif;
+}
+.hff-51 h1,
+.hff-51 h2,
+.hff-51 h3,
+.hff-51 h4,
+.hff-51 h5,
+.hff-51 h6,
+.hff-51 .tp-caption__title,
+.hff-51 .tp-caption__subtitle,
+.hff-51 .field--name-field-mt-highlight-title,
+.sff-51 .site-name,
+.slff-51 .site-slogan,
+.hff-51 .nav-tab__title,
+.hff-51 .views-field-field-mt-price,
+.hff-51 a.button,
+.hff-51 .button > a,
+.hff-51 input[type="submit"],
+.hff-51 input[type="reset"],
+.hff-51 input[type="button"],
+.hff-51 .field--name-field-mt-prd-buy-link,
+.hff-51 .field--name-field-mt-srv-buy-link,
+.hff-51 .field--name-field-mt-highlight-link,
+.hff-51 .page-node-type-mt-product .page-title,
+.hff-51 .field__label {
+  font-family: 'IBM Plex Sans', Helvetica Neue, Arial, sans-serif;
+}

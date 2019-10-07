@@ -1,0 +1,18 @@
+/**
+ * @file
+ * Styles for Catalog lite's node side affix.
+ */
+#affix.affix {
+  position: fixed;
+  width: 120px;
+}
+#affix.affix > div:first-child {
+  padding-top: 15px;
+}
+#affix.affix .share-links {
+  margin-top: 0;
+}
+#affix.affix-bottom {
+  position: absolute;
+  width: 120px;
+}

@@ -1,0 +1,143 @@
+/**
+ * @file
+ * Styles for Catalog lite's buttons.
+ */
+a.button,
+.button > a,
+button.button,
+input[type="submit"],
+input[type="reset"],
+input[type="button"] {
+  font-size: 15px;
+  font-weight: 400;
+  padding: 13px 30px 13px;
+  text-decoration: none;
+  display: inline-block;
+  line-height: 1;
+  border-width: 2px;
+  border-style: solid;
+  border-color: transparent;
+  background-color: transparent;
+  -webkit-border-radius: 0;
+  -moz-border-radius: 0;
+  border-radius: 0;
+  -webkit-transition: all 0.2s ease-in-out;
+  -moz-transition: all 0.2s ease-in-out;
+  -ms-transition: all 0.2s ease-in-out;
+  -o-transition: all 0.2s ease-in-out;
+  transition: all 0.2s ease-in-out;
+  margin: 10px 0;
+  text-align: center;
+  background-color: transparent;
+}
+button.button {
+  -webkit-appearance: none;
+}
+.region--dark-typography a.button.button--solid,
+.region--dark-typography .button.button--solid > a,
+.region--dark-typography input[type="submit"].button--solid,
+.region--dark-typography input[type="reset"].button--solid,
+.region--dark-typography input[type="button"].button--solid {
+  color: #ffffff;
+}
+a.button.button--small,
+.button.button--small > a {
+  font-size: 14px;
+  padding: 6px 20px;
+  border-width: 2px;
+  text-transform: none;
+}
+.headings-wide-spacing-enabled a.button,
+.headings-wide-spacing-enabled .button > a,
+.headings-wide-spacing-enabled button.button,
+.headings-wide-spacing-enabled input[type="submit"],
+.headings-wide-spacing-enabled input[type="reset"],
+.headings-wide-spacing-enabled input[type="button"] {
+  letter-spacing: 0.25em;
+}
+input[type="submit"] + input[type="submit"],
+.button + .button {
+  margin-left: 20px;
+}
+@media (max-width: 767px) {
+  .text-center .button + .button {
+    margin-right: 5px;
+  }
+  .text-center .button {
+    margin-right: 5px;
+    margin-left: 5px;
+  }
+}
+.region--light-typography a.button,
+.region--light-typography .button > a,
+.region--light-typography button.button,
+.region--light-typography input[type="submit"],
+.region--light-typography input[type="reset"],
+.region--light-typography input[type="button"] {
+  color: #ffffff;
+  border-color: #ffffff;
+}
+.region--light-typography a.button:hover,
+.region--light-typography a.button:focus,
+.region--light-typography .button > a:hover,
+.region--light-typography .button > a:focus,
+.region--light-typography button.button:hover,
+.region--light-typography button.button:focus,
+.region--light-typography input[type="submit"]:hover,
+.region--light-typography input[type="submit"]:focus,
+.region--light-typography input[type="reset"]:hover,
+.region--light-typography input[type="reset"]:focus,
+.region--light-typography input[type="button"]:hover,
+.region--light-typography input[type="button"]:focus {
+  color: #424242;
+  background: #ffffff;
+  border-color: #ffffff;
+}
+span.button-operator {
+  margin: 0 10px 0 5px;
+}
+a.button .svg-inline--fa {
+  margin-right: 10px;
+}
+a.button--no-margins {
+  margin: 0;
+}
+
+/*Buttons hover style 2*/
+a.button.button--hover-style-2,
+.button.button--hover-style-2 > a {
+  position: relative;
+  z-index: 1;
+  border-width: 2px;
+}
+a.button.button--hover-style-2:hover,
+.button.button--hover-style-2 > a:hover {
+  background: transparent;
+}
+a.button.button--hover-style-2:before,
+.button.button--hover-style-2 > a:before {
+  content:"";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  transform: scaleX(0);
+  border-radius: 0;
+  -webkit-transition: all 0.3s ease-in-out;
+  -moz-transition: all 0.3s ease-in-out;
+  -ms-transition: all 0.3s ease-in-out;
+  -o-transition: all 0.3s ease-in-out;
+  transition: all 0.3s ease-in-out;
+}
+a.button.button--hover-style-2:hover:before,
+a.button.button--hover-style-2:focus:before,
+.button.button--hover-style-2 > a:hover:before,
+.button.button--hover-style-2 > a:focus:before {
+  transform: scaleX(1);
+}
+.region--light-typography a.button.button--hover-style-2:before,
+.region--light-typography .button.button--hover-style-2 > a:before {
+  background-color: #ffffff;
+}

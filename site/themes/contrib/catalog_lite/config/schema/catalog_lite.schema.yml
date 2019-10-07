@@ -1,0 +1,5 @@
+# Schema for the configuration files of the Catalog lite theme.
+
+catalog_lite.settings:
+  type: theme_settings
+  label: 'Catalog lite settings'

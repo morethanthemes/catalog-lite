@@ -1,0 +1,25 @@
+/**
+ * @file
+ * Visual styles for Catalog lite's isotope filters.
+ */
+.isotope-container {
+  display: none;
+}
+.filters {
+  padding: 0 15px;
+}
+.isotope-container ul {
+  padding: 0;
+}
+.isotope-item {
+  list-style: none;
+}
+@media (max-width:767px) {
+  .isotope-item {
+    max-width: 100%;
+  }
+  .filters {
+    -ms-flex-pack: center;
+    justify-content: center;
+  }
+}

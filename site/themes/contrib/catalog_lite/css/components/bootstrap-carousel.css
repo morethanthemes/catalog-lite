@@ -1,0 +1,78 @@
+/**
+ * @file
+ * Styles for Catalog lite's bootstrap carousel.
+ */
+.mt-bootstrap-carousel img {
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+.mt-bootstrap-carousel .carousel-caption {
+  background: rgba(0,0,0,0.6);
+  width: 430px;
+  text-shadow: 0 0 50px rgba(0,0,0,0.5);
+  font-weight: 500;
+  color: #ffffff;
+  font-size: 26px;
+  line-height: 1.15;
+}
+.mt-bootstrap-carousel .carousel-caption a {
+  text-decoration: none;
+}
+@media (max-width: 991px) {
+  .mt-bootstrap-carousel .carousel-caption {
+    width: auto;
+  }
+}
+
+/*
+* Style for the controls
+*/
+.mt-bootstrap-carousel .carousel-caption a:hover {
+  text-decoration: underline;
+}
+.mt-bootstrap-carousel .mt-control-wrapper {
+  display: flex;
+}
+.mt-bootstrap-carousel .carousel-control-prev {
+  justify-content: flex-start;
+}
+.mt-bootstrap-carousel .carousel-control-next {
+  justify-content: flex-end;
+}
+.mt-bootstrap-carousel .mt-control-wrapper {
+  background: rgba(0,0,0,0.6);
+}
+.mt-bootstrap-carousel .carousel-control-next .mt-control-wrapper {
+  padding: 25px;
+}
+.mt-bootstrap-carousel .carousel-control-prev .mt-control-wrapper {
+  padding: 25px;
+}
+.mt-bootstrap-carousel .carousel-control-prev:hover .mt-control-wrapper,
+.mt-bootstrap-carousel .carousel-control-next:hover .mt-control-wrapper {
+  background: rgba(0,0,0,0.6);
+}
+@media (max-width: 991px) {
+  .mt-bootstrap-carousel .carousel-caption {
+    bottom: 100px;
+  }
+}
+
+/*
+* Styles for the indicators
+*/
+.carousel .carousel-indicators {
+  right: 0;
+  left: auto;
+}
+.carousel .carousel-indicators {
+  padding: 10px;
+  background: rgba(0,0,0,0.6);
+}
+@media (max-width: 991px) {
+  .carousel .carousel-indicators {
+    right: 0;
+    left: 0;
+  }
+}

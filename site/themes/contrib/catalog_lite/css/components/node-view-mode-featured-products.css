@@ -1,0 +1,89 @@
+/**
+ * @file
+ * Visual styles for Catalog lite's product content type slide view.
+ */
+.node--view-mode-mt-featured-product .node__title {
+  font-size: 60px;
+  text-align: center;
+  text-transform: uppercase;
+  margin-bottom: 0;
+}
+.region--dark-typography .node--view-mode-mt-featured-product .node__title a {
+  color: #2a2a2a;
+}
+.node--view-mode-mt-featured-product .field--name-field-mt-prd-subtitle {
+  font-size: 18px;
+  text-align: center;
+  margin-bottom: 50px;
+}
+.node--view-mode-mt-featured-product .field--name-field-mt-prd-subtitle {
+  position: relative;
+  top: -10px;
+}
+.node--view-mode-mt-featured-product .field--name-field-mt-prd-body {
+  line-height: 2.5;
+}
+.node--view-mode-mt-featured-product .field--name-field-mt-prd-subtitle:before {
+  background-color: rgba(255, 255, 255, 0.2);
+  content: "";
+  position: absolute;
+  top: -30px;
+  left: 0;
+  right: 0;
+  bottom: -15px;
+  z-index: -1;
+}
+.region--dark-typography .node--view-mode-mt-featured-product .field--name-field-mt-prd-subtitle:before {
+  background-color: #f7f7f7;
+  color: #2a2a2a;
+}
+.node--view-mode-mt-featured-product .field--name-field-mt-prd-subtitle p {
+  margin: 0;
+  padding: 0 20px 20px;
+}
+@media (min-width: 992px) {
+  .node--view-mode-mt-featured-product .field--name-field-mt-prd-subtitle {
+    width: 80%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+.node--view-mode-mt-featured-product .field--name-field-mt-prd-price {
+  text-align: center;
+  font-size: 30px;
+}
+.node--view-mode-mt-featured-product .field--name-field-mt-prd-buy-link {
+  text-align: center;
+}
+.node--view-mode-mt-featured-product .field--name-field-mt-prd-buy-link a {
+  font-size: 18px;
+  text-transform: uppercase;
+  font-weight: 400;
+  min-width: 190px;
+  padding: 16px 30px 15px;
+  color: #ffffff;
+  text-decoration: none;
+  display: inline-block;
+  line-height: 1;
+  border-width: 2px;
+  border-style: solid;
+  -webkit-border-radius: 0;
+  -moz-border-radius: 0;
+  border-radius: 0;
+  -webkit-transition: all 0.2s ease-in-out;
+  -moz-transition: all 0.2s ease-in-out;
+  -ms-transition: all 0.2s ease-in-out;
+  -o-transition: all 0.2s ease-in-out;
+  transition: all 0.2s ease-in-out;
+  margin: 10px 0 30px;
+  text-align: center;
+  background-color: transparent;
+}
+.region--light-typography .node--view-mode-mt-featured-product .field--name-field-mt-prd-buy-link a {
+  color: #ffffff;
+  border-color: #ffffff;
+}
+.region--light-typography .node--view-mode-mt-featured-product .field--name-field-mt-prd-buy-link a:hover,
+.region--light-typography .node--view-mode-mt-featured-product .field--name-field-mt-prd-buy-link a:focus {
+  background-color: #ffffff;
+}

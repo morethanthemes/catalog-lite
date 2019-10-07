@@ -1,0 +1,73 @@
+/**
+ * @file
+ * Styles for Catalog lite's full pager.
+ */
+
+/* Using .pager selector on the first one to override .region-content ul. */
+.pager__items {
+  margin: 20px 0;
+  padding: 0;
+  font-size: 0;
+  text-align: center;
+  padding-top: 25px;
+  border-top-width: 2px;
+  border-top-style: solid;
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+li.pager__item {
+  padding: 0;
+  margin: 0;
+  margin-top: -1px;
+  display: inline-block;
+}
+li.pager__item > a {
+  font-size: 16px;
+  text-align: center;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 0;
+  margin: 0 5px;
+  border-width: 2px;
+  border-style: solid;
+  border-color: transparent;
+  -webkit-border-radius: 0;
+  -moz-border-radius: 0;
+  border-radius: 0;
+  line-height: 31px;
+  text-decoration: none;
+  background-color: transparent;
+  display: block;
+  color: #2a2a2a;
+}
+li.pager__item a:hover,
+li.pager__item a:focus {
+  background-color: transparent;
+}
+li.pager__item--next a,
+li.pager__item--previous a,
+li.pager__item--last a,
+li.pager__item--first a {
+  padding: 0 15px;
+}
+
+/*mini pager @colored regions*/
+.region--light-typography li.pager__item > a {
+  color: #ffffff;
+  background-color: transparent;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.region--light-typography li.pager__item a:hover,
+.region--light-typography li.pager__item a:focus {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+.region--light-typography li.pager__item.is-active a,
+.region--light-typography li.pager__item.is-active a:hover,
+.region--light-typography li.pager__item.is-active a:focus {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+/*Reset Bootstrap's rules*/
+.pager {
+  margin: 0;
+}
