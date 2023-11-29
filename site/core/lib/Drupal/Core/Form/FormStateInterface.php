@@ -49,11 +49,11 @@ interface FormStateInterface {
    *   $form_state->loadInclude('node', 'inc', 'node.admin');
    * @endcode
    *
-   * Use this function instead of module_load_include() from inside a form
-   * constructor or any form processing logic as it ensures that the include file
-   * is loaded whenever the form is processed. In contrast to using
-   * module_load_include() directly, this method makes sure the include file is
-   * correctly loaded also if the form is cached.
+   * Use this function instead of \Drupal::moduleHandler()->loadInclude()
+   * from inside a form constructor or any form processing logic as it ensures
+   * that the include file is loaded whenever the form is processed. In contrast
+   * to using \Drupal::moduleHandler()->loadInclude() directly, this method
+   * makes sure the include file is correctly loaded also if the form is cached.
    *
    * @param string $module
    *   The module to which the include file belongs.
@@ -67,7 +67,7 @@ interface FormStateInterface {
    *   The filepath of the loaded include file, or FALSE if the include file was
    *   not found or has been loaded already.
    *
-   * @see module_load_include()
+   * @see \Drupal\Core\Extension\ModuleHandlerInterface::loadInclude()
    */
   public function loadInclude($module, $type, $name = NULL);
 
@@ -121,12 +121,13 @@ interface FormStateInterface {
    * @param array $route_parameters
    *   (optional) An associative array of parameter names and values.
    * @param array $options
-   *   (optional) An associative array of additional options. See
-   *   \Drupal\Core\Url for the available keys.
+   *   (optional) An associative array of additional options containing the
+   *   same values accepted from \Drupal\Core\Url::fromUri() for $options.
    *
    * @return $this
    *
    * @see \Drupal\Core\Form\FormSubmitterInterface::redirectForm()
+   * @see \Drupal\Core\Url::fromUri()
    */
   public function setRedirect($route_name, array $route_parameters = [], array $options = []);
 
@@ -164,6 +165,11 @@ interface FormStateInterface {
    *   The entire set of arbitrary data to store for this form.
    *
    * @return $this
+   *
+   * @see \Drupal\Core\Form\FormStateInterface::get()
+   * @see \Drupal\Core\Form\FormStateInterface::set()
+   * @see \Drupal\Core\Form\FormStateInterface::has()
+   * @see \Drupal\Core\Form\FormStateInterface::getStorage()
    */
   public function setStorage(array $storage);
 
@@ -172,11 +178,16 @@ interface FormStateInterface {
    *
    * @return array
    *   The entire set of arbitrary data to store for this form.
+   *
+   * @see \Drupal\Core\Form\FormStateInterface::get()
+   * @see \Drupal\Core\Form\FormStateInterface::set()
+   * @see \Drupal\Core\Form\FormStateInterface::has()
+   * @see \Drupal\Core\Form\FormStateInterface::setStorage()
    */
   public function &getStorage();
 
   /**
-   * Gets any arbitrary property.
+   * Gets the value for a property in the form state storage.
    *
    * @param string|array $property
    *   Properties are often stored as multi-dimensional associative arrays. If
@@ -187,11 +198,16 @@ interface FormStateInterface {
    * @return mixed
    *   A reference to the value for that property, or NULL if the property does
    *   not exist.
+   *
+   * @see \Drupal\Core\Form\FormStateInterface::set()
+   * @see \Drupal\Core\Form\FormStateInterface::has()
+   * @see \Drupal\Core\Form\FormStateInterface::getStorage()
+   * @see \Drupal\Core\Form\FormStateInterface::setStorage()
    */
   public function &get($property);
 
   /**
-   * Sets a value to an arbitrary property.
+   * Sets the value for a property in the form state storage.
    *
    * @param string|array $property
    *   Properties are often stored as multi-dimensional associative arrays. If
@@ -203,18 +219,28 @@ interface FormStateInterface {
    *   The value to set.
    *
    * @return $this
+   *
+   * @see \Drupal\Core\Form\FormStateInterface::get()
+   * @see \Drupal\Core\Form\FormStateInterface::has()
+   * @see \Drupal\Core\Form\FormStateInterface::getStorage()
+   * @see \Drupal\Core\Form\FormStateInterface::setStorage()
    */
   public function set($property, $value);
 
   /**
-   * Determines if an arbitrary property is present.
+   * Determines if a property is present in the form state storage.
    *
-   * @param string $property
+   * @param string|array $property
    *   Properties are often stored as multi-dimensional associative arrays. If
    *   $property is a string, it will return isset($storage[$property]). If
    *   $property is an array, each element of the array will be used as a nested
    *   key. If $property = ['foo', 'bar'] it will return
    *   isset($storage['foo']['bar']).
+   *
+   * @see \Drupal\Core\Form\FormStateInterface::get()
+   * @see \Drupal\Core\Form\FormStateInterface::set()
+   * @see \Drupal\Core\Form\FormStateInterface::getStorage()
+   * @see \Drupal\Core\Form\FormStateInterface::setStorage()
    */
   public function has($property);
 

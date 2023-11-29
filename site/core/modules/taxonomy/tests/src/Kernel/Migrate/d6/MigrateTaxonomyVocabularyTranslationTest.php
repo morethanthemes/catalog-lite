@@ -14,20 +14,19 @@ class MigrateTaxonomyVocabularyTranslationTest extends MigrateDrupal6TestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = [
+  protected static $modules = [
     'config_translation',
     'language',
     'taxonomy',
-    // Required for translation migrations.
-    'migrate_drupal_multilingual',
   ];
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->executeMigrations([
+      'language',
       'd6_taxonomy_vocabulary',
       'd6_taxonomy_vocabulary_translation',
     ]);
@@ -46,7 +45,7 @@ class MigrateTaxonomyVocabularyTranslationTest extends MigrateDrupal6TestBase {
     $this->assertSame('fr - vocabulary 2 (i=1)', $config->get('name'));
     $config = $language_manager->getLanguageConfigOverride('fr', 'taxonomy.vocabulary.vocabulary_3_i_2_');
     $this->assertSame('fr - vocabulary 3 (i=2)', $config->get('name'));
-    $config = $language_manager->getLanguageConfigOverride('fr', 'taxonomy.vocabulary.vocabulary_name_much_longer_than');
+    $config = $language_manager->getLanguageConfigOverride('fr', 'taxonomy.vocabulary.vocabulary_name_much_longer_th');
     $this->assertSame('Nom de vocabulaire beaucoup plus long que trente-deux caractères', $config->get('name'));
     $config = $language_manager->getLanguageConfigOverride('fr', 'taxonomy.vocabulary.tags');
     $this->assertSame('fr - Tags', $config->get('name'));

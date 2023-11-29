@@ -17,9 +17,8 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
  * Service which builds the media library.
  *
  * @internal
- *   Media Library is an experimental module and its internal code may be
- *   subject to change in minor releases. External code should not instantiate
- *   or extend this class.
+ *   This service is an internal part of the modal media library dialog and
+ *   does not provide any extension points.
  */
 class MediaLibraryUiBuilder {
 
@@ -74,15 +73,11 @@ class MediaLibraryUiBuilder {
    * @param \Drupal\media_library\OpenerResolverInterface $opener_resolver
    *   The opener resolver.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, RequestStack $request_stack, ViewExecutableFactory $views_executable_factory, FormBuilderInterface $form_builder, OpenerResolverInterface $opener_resolver = NULL) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, RequestStack $request_stack, ViewExecutableFactory $views_executable_factory, FormBuilderInterface $form_builder, OpenerResolverInterface $opener_resolver) {
     $this->entityTypeManager = $entity_type_manager;
     $this->request = $request_stack->getCurrentRequest();
     $this->viewsExecutableFactory = $views_executable_factory;
     $this->formBuilder = $form_builder;
-    if (!$opener_resolver) {
-      @trigger_error('The media_library.opener_resolver service must be passed to ' . __METHOD__ . ' and will be required before Drupal 9.0.0.', E_USER_DEPRECATED);
-      $opener_resolver = \Drupal::service('media_library.opener_resolver');
-    }
     $this->openerResolver = $opener_resolver;
   }
 
@@ -123,11 +118,9 @@ class MediaLibraryUiBuilder {
     }
     else {
       return [
-        '#type' => 'html_tag',
-        '#tag' => 'div',
+        '#theme' => 'media_library_wrapper',
         '#attributes' => [
           'id' => 'media-library-wrapper',
-          'class' => ['media-library-wrapper'],
         ],
         'menu' => $this->buildMediaTypeMenu($state),
         'content' => $this->buildLibraryContent($state),
@@ -157,12 +150,12 @@ class MediaLibraryUiBuilder {
    */
   protected function buildLibraryContent(MediaLibraryState $state) {
     return [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
+      '#type' => 'container',
+      '#theme_wrappers' => [
+        'container__media_library_content',
+      ],
       '#attributes' => [
         'id' => 'media-library-content',
-        'class' => ['media-library-content'],
-        'tabindex' => -1,
       ],
       'form' => $this->buildMediaTypeAddForm($state),
       'view' => $this->buildMediaLibraryView($state),
@@ -232,13 +225,13 @@ class MediaLibraryUiBuilder {
       return [];
     }
 
-    // @todo: Add a class to the li element.
+    // @todo Add a class to the li element.
     //   https://www.drupal.org/project/drupal/issues/3029227
     $menu = [
-      '#theme' => 'links',
+      '#theme' => 'links__media_library_menu',
       '#links' => [],
       '#attributes' => [
-        'class' => ['media-library-menu', 'js-media-library-menu'],
+        'class' => ['js-media-library-menu'],
       ],
     ];
 
@@ -268,7 +261,6 @@ class MediaLibraryUiBuilder {
           'query' => $link_state->all(),
         ]),
         'attributes' => [
-          'class' => ['media-library-menu__link'],
           'role' => 'button',
           'data-title' => $title,
         ],
@@ -293,7 +285,11 @@ class MediaLibraryUiBuilder {
   protected function buildMediaTypeAddForm(MediaLibraryState $state) {
     $selected_type_id = $state->getSelectedTypeId();
 
-    if (!$this->entityTypeManager->getAccessControlHandler('media')->createAccess($selected_type_id)) {
+    $access_handler = $this->entityTypeManager->getAccessControlHandler('media');
+    $context = [
+      'media_library_state' => $state,
+    ];
+    if (!$access_handler->createAccess($selected_type_id, NULL, $context)) {
       return [];
     }
 
@@ -331,7 +327,7 @@ class MediaLibraryUiBuilder {
     //   https://www.drupal.org/project/drupal/issues/2971209
     $view = $this->entityTypeManager->getStorage('view')->load('media_library');
     $view_executable = $this->viewsExecutableFactory->get($view);
-    $display_id = 'widget';
+    $display_id = $state->get('views_display_id', 'widget');
 
     // Make sure the state parameters are set in the request so the view can
     // pass the parameters along in the pager, filters etc.
@@ -340,12 +336,6 @@ class MediaLibraryUiBuilder {
     $view_executable->setRequest($view_request);
 
     $args = [$state->getSelectedTypeId()];
-
-    // Make sure the state parameters are set in the request so the view can
-    // pass the parameters along in the pager, filters etc.
-    $request = $view_executable->getRequest();
-    $request->query->add($state->all());
-    $view_executable->setRequest($request);
 
     $view_executable->setDisplay($display_id);
     $view_executable->preExecute($args);

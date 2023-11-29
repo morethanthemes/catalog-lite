@@ -10,12 +10,12 @@ use Drupal\Core\Url;
  *
  * @group jsonapi
  */
-class ConfigTestTest extends ResourceTestBase {
+class ConfigTestTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['config_test', 'config_test_rest'];
+  protected static $modules = ['config_test', 'config_test_rest'];
 
   /**
    * {@inheritdoc}
@@ -33,6 +33,11 @@ class ConfigTestTest extends ResourceTestBase {
    * @var \Drupal\config_test\ConfigTestInterface
    */
   protected $entity;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -111,6 +116,7 @@ class ConfigTestTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
 }

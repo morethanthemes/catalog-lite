@@ -2,7 +2,9 @@
 
 namespace Drupal\media_library\Plugin\views\field;
 
+use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\CloseDialogCommand;
+use Drupal\Core\Ajax\MessageCommand;
 use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
@@ -18,9 +20,7 @@ use Symfony\Component\HttpFoundation\Request;
  * @ViewsField("media_library_select_form")
  *
  * @internal
- *   Media Library is an experimental module and its internal code may be
- *   subject to change in minor releases. External code should not instantiate
- *   or extend this class.
+ *   Plugin classes are internal.
  */
 class MediaLibrarySelectForm extends FieldPluginBase {
 
@@ -47,14 +47,29 @@ class MediaLibrarySelectForm extends FieldPluginBase {
    *   The current state of the form.
    */
   public function viewsForm(array &$form, FormStateInterface $form_state) {
-    $form['#attributes'] = [
-      'class' => ['media-library-views-form', 'js-media-library-views-form'],
+    $form['#attributes']['class'] = ['js-media-library-views-form'];
+    // Add target for AJAX messages.
+    $form['media_library_messages'] = [
+      '#type' => 'container',
+      '#attributes' => [
+        'id' => 'media-library-messages',
+      ],
+      '#weight' => -10,
     ];
+
+    // Add an attribute that identifies the media type displayed in the form.
+    if (isset($this->view->args[0])) {
+      $form['#attributes']['data-drupal-media-type'] = $this->view->args[0];
+    }
 
     // Render checkboxes for all rows.
     $form[$this->options['id']]['#tree'] = TRUE;
     foreach ($this->view->result as $row_index => $row) {
       $entity = $this->getEntity($row);
+      if (!$entity) {
+        $form[$this->options['id']][$row_index] = [];
+        continue;
+      }
       $form[$this->options['id']][$row_index] = [
         '#type' => 'checkbox',
         '#title' => $this->t('Select @label', [
@@ -82,29 +97,21 @@ class MediaLibrarySelectForm extends FieldPluginBase {
     // AJAX path like /views/ajax, which cannot process AJAX form submits.
     $query = $this->view->getRequest()->query->all();
     $query[FormBuilderInterface::AJAX_FORM_REQUEST] = TRUE;
+    $query['views_display_id'] = $this->view->getDisplay()->display['id'];
     $form['actions']['submit']['#ajax'] = [
       'url' => Url::fromRoute('media_library.ui'),
       'options' => [
         'query' => $query,
       ],
       'callback' => [static::class, 'updateWidget'],
+      // The AJAX system automatically moves focus to the first tabbable
+      // element of the modal, so we need to disable refocus on the button.
+      'disable-refocus' => TRUE,
     ];
 
     $form['actions']['submit']['#value'] = $this->t('Insert selected');
     $form['actions']['submit']['#button_type'] = 'primary';
     $form['actions']['submit']['#field_id'] = $selection_field_id;
-    // By default, the AJAX system tries to move the focus back to the element
-    // that triggered the AJAX request. Since the media library is closed after
-    // clicking the select button, the focus can't be moved back. We need to set
-    // the 'data-disable-refocus' attribute to prevent the AJAX system from
-    // moving focus to a random element. The select button triggers an update in
-    // the opener, and the opener should be responsible for moving the focus. An
-    // example of this can be seen in MediaLibraryWidget::updateWidget().
-    // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::updateWidget()
-    $form['actions']['submit']['#attributes'] = [
-      'class' => ['media-library-select'],
-      'data-disable-refocus' => 'true',
-    ];
   }
 
   /**
@@ -127,6 +134,19 @@ class MediaLibrarySelectForm extends FieldPluginBase {
 
     // Allow the opener service to handle the selection.
     $state = MediaLibraryState::fromRequest($request);
+
+    $current_selection = $form_state->getValue('media_library_select_form_selection');
+    $available_slots = $state->getAvailableSlots();
+    $selected_count = count(explode(',', $current_selection));
+    if ($available_slots > 0 && $selected_count > $available_slots) {
+      $response = new AjaxResponse();
+      $error = \Drupal::translation()->formatPlural($selected_count - $available_slots, 'There are currently @total items selected. The maximum number of items for the field is @max. Please remove @count item from the selection.', 'There are currently @total items selected. The maximum number of items for the field is @max. Please remove @count items from the selection.', [
+        '@total' => $selected_count,
+        '@max' => $available_slots,
+      ]);
+      $response->addCommand(new MessageCommand($error, '#media-library-messages', ['type' => 'error']));
+      return $response;
+    }
 
     return \Drupal::service('media_library.opener_resolver')
       ->get($state)

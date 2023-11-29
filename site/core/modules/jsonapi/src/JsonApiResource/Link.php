@@ -3,6 +3,7 @@
 namespace Drupal\jsonapi\JsonApiResource;
 
 use Drupal\Component\Assertion\Inspector;
+use Drupal\Component\Utility\DiffArray;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableDependencyTrait;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -14,7 +15,7 @@ use Drupal\Core\Url;
  * @internal JSON:API maintains no PHP API. The API is the HTTP API. This class
  *   may change at any time and could break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  *
  * @see https://tools.ietf.org/html/rfc8288
@@ -41,6 +42,9 @@ final class Link implements CacheableDependencyInterface {
    * The link relation types.
    *
    * @var string[]
+   *
+   * @todo: change this type documentation to be a single string in
+   *   https://www.drupal.org/project/drupal/issues/3080467.
    */
   protected $rel;
 
@@ -64,26 +68,22 @@ final class Link implements CacheableDependencyInterface {
    *   entity on which the link will appear.
    * @param \Drupal\Core\Url $url
    *   The Url object for the link.
-   * @param string[] $link_relation_types
+   * @param string $link_relation_type
    *   An array of registered or extension RFC8288 link relation types.
    * @param array $target_attributes
    *   An associative array of target attributes for the link.
    *
    * @see https://tools.ietf.org/html/rfc8288#section-2.1
    */
-  public function __construct(CacheableMetadata $cacheability, Url $url, array $link_relation_types, array $target_attributes = []) {
-    // @todo: uncomment the extra assertion below when JSON:API begins to use its own extension relation types.
-    assert(/* !empty($link_relation_types) && */Inspector::assertAllStrings($link_relation_types));
+  public function __construct(CacheableMetadata $cacheability, Url $url, string $link_relation_type, array $target_attributes = []) {
     assert(Inspector::assertAllStrings(array_keys($target_attributes)));
     assert(Inspector::assertAll(function ($target_attribute_value) {
-      return is_string($target_attribute_value)
-        || is_array($target_attribute_value)
-        && Inspector::assertAllStrings($target_attribute_value);
+      return is_string($target_attribute_value) || is_array($target_attribute_value);
     }, array_values($target_attributes)));
     $generated_url = $url->setAbsolute()->toString(TRUE);
     $this->href = $generated_url->getGeneratedUrl();
     $this->uri = $url;
-    $this->rel = $link_relation_types;
+    $this->rel = $link_relation_type;
     $this->attributes = $target_attributes;
     $this->setCacheability($cacheability->addCacheableDependency($generated_url));
   }
@@ -109,12 +109,12 @@ final class Link implements CacheableDependencyInterface {
   }
 
   /**
-   * Gets the link's relation types.
+   * Gets the link's relation type.
    *
-   * @return string[]
-   *   The link's relation types.
+   * @return string
+   *   The link's relation type.
    */
-  public function getLinkRelationTypes() {
+  public function getLinkRelationType() {
     return $this->rel;
   }
 
@@ -129,7 +129,7 @@ final class Link implements CacheableDependencyInterface {
   }
 
   /**
-   * Compares two links by their href.
+   * Compares two links.
    *
    * @param \Drupal\jsonapi\JsonApiResource\Link $a
    *   The first link.
@@ -137,16 +137,27 @@ final class Link implements CacheableDependencyInterface {
    *   The second link.
    *
    * @return int
-   *   The result of strcmp() on the links' hrefs.
+   *   0 if the links can be considered identical, an integer greater than or
+   *   less than 0 otherwise.
    */
   public static function compare(Link $a, Link $b) {
-    return strcmp($a->getHref(), $b->getHref());
+    // Any string concatenation would work, but a Link header-like format makes
+    // it clear what is being compared.
+    $a_string = sprintf('<%s>;rel="%s"', $a->getHref(), $a->rel);
+    $b_string = sprintf('<%s>;rel="%s"', $b->getHref(), $b->rel);
+    $cmp = strcmp($a_string, $b_string);
+    // If the `href` or `rel` of the links are not equivalent, it's not
+    // necessary to compare target attributes.
+    if ($cmp === 0) {
+      return (int) !empty(DiffArray::diffAssocRecursive($a->getTargetAttributes(), $b->getTargetAttributes()));
+    }
+    return $cmp;
   }
 
   /**
-   * Merges two link objects' relation types and target attributes.
+   * Merges two equivalent links into one link with the merged cacheability.
    *
-   * The links must share the same URI.
+   * The links must share the same URI, link relation type and attributes.
    *
    * @param \Drupal\jsonapi\JsonApiResource\Link $a
    *   The first link.
@@ -154,25 +165,12 @@ final class Link implements CacheableDependencyInterface {
    *   The second link.
    *
    * @return static
-   *   A new JSON:API Link object with the link relation type and target
-   *   attributes merged.
+   *   A new JSON:API Link object with the cacheability of both links merged.
    */
   public static function merge(Link $a, Link $b) {
-    assert(static::compare($a, $b) === 0);
-    $merged_rels = array_unique(array_merge($a->getLinkRelationTypes(), $b->getLinkRelationTypes()));
-    $merged_attributes = $a->getTargetAttributes();
-    foreach ($b->getTargetAttributes() as $key => $value) {
-      if (isset($merged_attributes[$key])) {
-        // The attribute values can be either a string or an array of strings.
-        $value = array_unique(array_merge(
-          is_string($merged_attributes[$key]) ? [$merged_attributes[$key]] : $merged_attributes[$key],
-          is_string($value) ? [$value] : $value
-        ));
-      }
-      $merged_attributes[$key] = count($value) === 1 ? reset($value) : $value;
-    }
+    assert(static::compare($a, $b) === 0, 'Only equivalent links can be merged.');
     $merged_cacheability = (new CacheableMetadata())->addCacheableDependency($a)->addCacheableDependency($b);
-    return new static($merged_cacheability, $a->getUri(), $merged_rels, $merged_attributes);
+    return new static($merged_cacheability, $a->getUri(), $a->getLinkRelationType(), $a->getTargetAttributes());
   }
 
 }

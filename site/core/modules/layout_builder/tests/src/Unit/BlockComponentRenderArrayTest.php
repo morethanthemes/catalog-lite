@@ -43,7 +43,7 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
   protected $blockManager;
 
   /**
-   * Dataprovider for test functions that should test block types.
+   * Data provider for test functions that should test block types.
    */
   public function providerBlockTypes() {
     return [
@@ -55,7 +55,7 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->blockManager = $this->prophesize(BlockManagerInterface::class);
@@ -99,7 +99,10 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
     $placeholder_label = 'Placeholder Label';
     $block->getPreviewFallbackString()->willReturn($placeholder_label);
 
-    $block_content = ['#markup' => 'The block content.'];
+    $block_content = [
+      '#markup' => 'The block content.',
+      '#cache' => ['tags' => ['build-tag']],
+    ];
     $block->build()->willReturn($block_content);
     $this->blockManager->createInstance('some_block_id', ['id' => 'some_block_id'])->willReturn($block->reveal());
 
@@ -117,15 +120,16 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
       '#base_plugin_id' => 'block_plugin_id',
       '#derivative_plugin_id' => NULL,
       'content' => $block_content,
-      '#attributes' => [
-        'data-layout-content-preview-placeholder-label' => $placeholder_label,
-      ],
+      '#in_preview' => FALSE,
     ];
 
-    $expected_cache = $expected_build + [
+    $expected_build_with_expected_cache = $expected_build + [
       '#cache' => [
         'contexts' => [],
-        'tags' => ['test'],
+        'tags' => [
+          'build-tag',
+          'test',
+        ],
         'max-age' => -1,
       ],
     ];
@@ -134,7 +138,7 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
     $result = $event->getBuild();
     $this->assertEquals($expected_build, $result);
     $event->getCacheableMetadata()->applyTo($result);
-    $this->assertEquals($expected_cache, $result);
+    $this->assertEqualsCanonicalizing($expected_build_with_expected_cache['#cache'], $result['#cache']);
   }
 
   /**
@@ -192,9 +196,7 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
       '#base_plugin_id' => 'block_plugin_id',
       '#derivative_plugin_id' => NULL,
       'content' => $block_content,
-      '#attributes' => [
-        'data-layout-content-preview-placeholder-label' => $placeholder_label,
-      ],
+      '#in_preview' => FALSE,
     ];
 
     $expected_cache = $expected_build + [
@@ -324,6 +326,7 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
       '#attributes' => [
         'data-layout-content-preview-placeholder-label' => $placeholder_label,
       ],
+      '#in_preview' => TRUE,
     ];
 
     $expected_cache = $expected_build + [
@@ -332,6 +335,7 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
         'tags' => ['test'],
         'max-age' => 0,
       ],
+      '#in_preview' => TRUE,
     ];
 
     $subscriber->onBuildRender($event);
@@ -383,6 +387,7 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
       '#attributes' => [
         'data-layout-content-preview-placeholder-label' => $placeholder_string,
       ],
+      '#in_preview' => TRUE,
     ];
     $expected_build['content']['#markup'] = $placeholder_string;
 
@@ -392,6 +397,7 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
         'tags' => ['test'],
         'max-age' => 0,
       ],
+      '#in_preview' => TRUE,
     ];
 
     $subscriber->onBuildRender($event);
@@ -416,7 +422,9 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
     $block->getBaseId()->willReturn('block_plugin_id');
     $block->getDerivativeId()->willReturn(NULL);
 
-    $block->build()->willReturn([]);
+    $block->build()->willReturn([
+      '#cache' => ['tags' => ['build-tag']],
+    ]);
     $this->blockManager->createInstance('some_block_id', ['id' => 'some_block_id'])->willReturn($block->reveal());
 
     $component = new SectionComponent('some-uuid', 'some-region', ['id' => 'some_block_id']);
@@ -429,7 +437,10 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
     $expected_cache = $expected_build + [
       '#cache' => [
         'contexts' => [],
-        'tags' => ['test'],
+        'tags' => [
+          'build-tag',
+          'test',
+        ],
         'max-age' => -1,
       ],
     ];
@@ -438,7 +449,52 @@ class BlockComponentRenderArrayTest extends UnitTestCase {
     $result = $event->getBuild();
     $this->assertEquals($expected_build, $result);
     $event->getCacheableMetadata()->applyTo($result);
-    $this->assertEquals($expected_cache, $result);
+    $this->assertEqualsCanonicalizing($expected_cache, $result);
+  }
+
+  /**
+   * @covers ::onBuildRender
+   */
+  public function testOnBuildRenderEmptyBuildWithCacheTags() {
+    $block = $this->prophesize(BlockPluginInterface::class);
+    $access_result = AccessResult::allowed();
+    $block->access($this->account->reveal(), TRUE)->willReturn($access_result)->shouldBeCalled();
+    $block->getCacheContexts()->willReturn([]);
+    $block->getCacheTags()->willReturn(['test']);
+    $block->getCacheMaxAge()->willReturn(Cache::PERMANENT);
+    $block->getConfiguration()->willReturn([]);
+    $block->getPluginId()->willReturn('block_plugin_id');
+    $block->getBaseId()->willReturn('block_plugin_id');
+    $block->getDerivativeId()->willReturn(NULL);
+
+    $block_content = [
+      '#cache' => [
+        'tags' => ['empty_build_cache_test'],
+      ],
+    ];
+    $block->build()->willReturn($block_content);
+    $this->blockManager->createInstance('some_block_id', ['id' => 'some_block_id'])->willReturn($block->reveal());
+
+    $component = new SectionComponent('some-uuid', 'some-region', ['id' => 'some_block_id']);
+    $event = new SectionComponentBuildRenderArrayEvent($component, [], FALSE);
+
+    $subscriber = new BlockComponentRenderArray($this->account->reveal());
+
+    $expected_build = [];
+
+    $expected_cache = $expected_build + [
+      '#cache' => [
+        'contexts' => [],
+        'tags' => ['empty_build_cache_test', 'test'],
+        'max-age' => -1,
+      ],
+    ];
+
+    $subscriber->onBuildRender($event);
+    $result = $event->getBuild();
+    $this->assertEquals($expected_build, $result);
+    $event->getCacheableMetadata()->applyTo($result);
+    $this->assertEqualsCanonicalizing($expected_cache, $result);
   }
 
   /**

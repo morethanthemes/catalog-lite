@@ -3,8 +3,9 @@
 namespace Drupal\big_pipe_regression_test;
 
 use Drupal\big_pipe\Render\BigPipeMarkup;
+use Drupal\Core\Security\TrustedCallbackInterface;
 
-class BigPipeRegressionTestController {
+class BigPipeRegressionTestController implements TrustedCallbackInterface {
 
   const MARKER_2678662 = '<script>var hitsTheFloor = "</body>";</script>';
 
@@ -32,6 +33,32 @@ class BigPipeRegressionTestController {
   }
 
   /**
+   * A page with large content.
+   *
+   * @see \Drupal\Tests\big_pipe\FunctionalJavascript\BigPipeRegressionTest::testBigPipeLargeContent
+   */
+  public function largeContent() {
+    return [
+      'item1' => [
+        '#lazy_builder' => [static::class . '::largeContentBuilder', []],
+        '#create_placeholder' => TRUE,
+      ],
+    ];
+  }
+
+  /**
+   * Renders large content.
+   *
+   * @see \Drupal\Tests\big_pipe\FunctionalJavascript\BigPipeRegressionTest::testBigPipeLargeContent
+   */
+  public static function largeContentBuilder() {
+    return [
+      '#theme' => 'big_pipe_test_large_content',
+      '#cache' => ['max-age' => 0],
+    ];
+  }
+
+  /**
    * #lazy_builder callback; builds <time> markup with current time.
    *
    * @return array
@@ -41,6 +68,13 @@ class BigPipeRegressionTestController {
       '#markup' => '<time datetime="' . date('Y-m-d', time()) . '"></time>',
       '#cache' => ['max-age' => 0],
     ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function trustedCallbacks() {
+    return ['currentTime', 'largeContentBuilder'];
   }
 
 }

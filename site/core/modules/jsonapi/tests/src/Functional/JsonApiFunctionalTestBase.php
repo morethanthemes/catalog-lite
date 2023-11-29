@@ -33,7 +33,7 @@ abstract class JsonApiFunctionalTestBase extends BrowserTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = [
+  protected static $modules = [
     'jsonapi',
     'serialization',
     'node',
@@ -41,6 +41,11 @@ abstract class JsonApiFunctionalTestBase extends BrowserTestBase {
     'taxonomy',
     'link',
   ];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * Test user.
@@ -87,7 +92,7 @@ abstract class JsonApiFunctionalTestBase extends BrowserTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     // Set up a HTTP client that accepts relative URLs.
@@ -186,7 +191,7 @@ abstract class JsonApiFunctionalTestBase extends BrowserTestBase {
       'administer taxonomy',
     ]);
 
-    drupal_flush_all_caches();
+    \Drupal::service('router.builder')->rebuild();
   }
 
   /**
@@ -281,7 +286,7 @@ abstract class JsonApiFunctionalTestBase extends BrowserTestBase {
       }
       if ($article_has_image) {
         $file = File::create([
-          'uri' => 'vfs://' . $random->name() . '.png',
+          'uri' => 'public://' . $random->name() . '.png',
         ]);
         $file->setPermanent();
         $file->save();
@@ -322,7 +327,7 @@ abstract class JsonApiFunctionalTestBase extends BrowserTestBase {
       // Make sure that there is at least 1 https link for ::testRead() #19.
       $this->nodes[0]->field_link = [
         'title' => 'Drupal',
-        'uri' => 'https://drupal.org',
+        'uri' => 'https://example.com',
       ];
       $this->nodes[0]->save();
     }

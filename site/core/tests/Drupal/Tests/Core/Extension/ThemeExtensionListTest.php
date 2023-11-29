@@ -2,7 +2,6 @@
 
 namespace Drupal\Tests\Core\Extension;
 
-use Drupal\Core\Cache\MemoryBackend;
 use Drupal\Core\Cache\NullBackend;
 use Drupal\Core\Extension\Extension;
 use Drupal\Core\Extension\ExtensionDiscovery;
@@ -12,7 +11,6 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeEngineExtensionList;
 use Drupal\Core\Extension\ThemeExtensionList;
 use Drupal\Core\KeyValueStore\KeyValueMemoryFactory;
-use Drupal\Core\Lock\NullLockBackend;
 use Drupal\Core\State\State;
 use Drupal\Tests\UnitTestCase;
 use Prophecy\Argument;
@@ -31,29 +29,30 @@ class ThemeExtensionListTest extends UnitTestCase {
     $extension_discovery
       ->scan('theme')
       ->willReturn([
-        'test_subtheme'  => new Extension($this->root, 'theme', $this->root . '/core/modules/system/tests/themes/test_subtheme/test_subtheme.info.yml', 'test_subtheme.info.yml'),
-        'test_basetheme' => new Extension($this->root, 'theme', $this->root . '/core/modules/system/tests/themes/test_basetheme/test_basetheme.info.yml', 'test_basetheme.info.yml'),
+        'test_subtheme'  => new Extension($this->root, 'theme', 'core/modules/system/tests/themes/test_subtheme/test_subtheme.info.yml', 'test_subtheme.info.yml'),
+        'test_basetheme' => new Extension($this->root, 'theme', 'core/modules/system/tests/themes/test_basetheme/test_basetheme.info.yml', 'test_basetheme.info.yml'),
       ]);
     $extension_discovery
       ->scan('theme_engine')
       ->willReturn([
-        'twig' => new Extension($this->root, 'theme_engine', $this->root . '/core/themes/engines/twig/twig.info.yml', 'twig.engine'),
+        'twig' => new Extension($this->root, 'theme_engine', 'core/themes/engines/twig/twig.info.yml', 'twig.engine'),
       ]);
 
     // Verify that info parser is called with the specified paths.
     $argument_condition = function ($path) {
       return in_array($path, [
-        $this->root . '/core/modules/system/tests/themes/test_subtheme/test_subtheme.info.yml',
-        $this->root . '/core/modules/system/tests/themes/test_basetheme/test_basetheme.info.yml',
-        $this->root . '/core/themes/engines/twig/twig.info.yml',
+        'core/modules/system/tests/themes/test_subtheme/test_subtheme.info.yml',
+        'core/modules/system/tests/themes/test_basetheme/test_basetheme.info.yml',
+        'core/themes/engines/twig/twig.info.yml',
       ], TRUE);
     };
     $info_parser = $this->prophesize(InfoParserInterface::class);
+    $root = $this->root;
     $info_parser->parse(Argument::that($argument_condition))
       ->shouldBeCalled()
-      ->will(function ($file) {
-        $info_parser = new InfoParser();
-        return $info_parser->parse($file[0]);
+      ->will(function ($file) use ($root) {
+        $info_parser = new InfoParser($root);
+        return $info_parser->parse($root . '/' . $file[0]);
       });
 
     $module_handler = $this->prophesize(ModuleHandlerInterface::class);
@@ -64,7 +63,7 @@ class ThemeExtensionListTest extends UnitTestCase {
       ->alter('system_info', Argument::type('array'), Argument::type(Extension::class), Argument::any())
       ->shouldBeCalled();
 
-    $state = new State(new KeyValueMemoryFactory(), new MemoryBackend(), new NullLockBackend());
+    $state = new State(new KeyValueMemoryFactory());
 
     $config_factory = $this->getConfigFactoryStub([
       'core.extension' => [
@@ -77,7 +76,7 @@ class ThemeExtensionListTest extends UnitTestCase {
       ],
     ]);
 
-    $theme_engine_list = new TestThemeEngineExtensionList($this->root, 'theme_engine', new NullBackend('test'), $info_parser->reveal(), $module_handler->reveal(), $state, $config_factory, 'testing');
+    $theme_engine_list = new TestThemeEngineExtensionList($this->root, 'theme_engine', new NullBackend('test'), $info_parser->reveal(), $module_handler->reveal(), $state, $config_factory);
     $theme_engine_list->setExtensionDiscovery($extension_discovery->reveal());
 
     $theme_list = new TestThemeExtensionList($this->root, 'theme', new NullBackend('test'), $info_parser->reveal(), $module_handler->reveal(), $state, $config_factory, $theme_engine_list, 'testing');
@@ -99,9 +98,9 @@ class ThemeExtensionListTest extends UnitTestCase {
     $info_subtheme->info['base theme'] = 'test_basetheme';
     $info_basetheme->sub_themes = ['test_subtheme'];
 
-    $this->assertEquals($this->root . '/core/themes/engines/twig/twig.engine', $info_basetheme->owner);
+    $this->assertEquals('core/themes/engines/twig/twig.engine', $info_basetheme->owner);
     $this->assertEquals('twig', $info_basetheme->prefix);
-    $this->assertEquals($this->root . '/core/themes/engines/twig/twig.engine', $info_subtheme->owner);
+    $this->assertEquals('core/themes/engines/twig/twig.engine', $info_subtheme->owner);
     $this->assertEquals('twig', $info_subtheme->prefix);
   }
 
@@ -120,10 +119,10 @@ class ThemeExtensionListTest extends UnitTestCase {
   public function testGetBaseThemes(array $themes, $theme, array $expected) {
     // Mocks and stubs.
     $module_handler = $this->prophesize(ModuleHandlerInterface::class);
-    $state = new State(new KeyValueMemoryFactory(), new MemoryBackend(), new NullLockBackend());
+    $state = new State(new KeyValueMemoryFactory());
     $config_factory = $this->getConfigFactoryStub([]);
     $theme_engine_list = $this->prophesize(ThemeEngineExtensionList::class);
-    $theme_listing = new ThemeExtensionList($this->root, 'theme', new NullBackend('test'), new InfoParser(), $module_handler->reveal(), $state, $config_factory, $theme_engine_list->reveal(), 'test');
+    $theme_listing = new ThemeExtensionList($this->root, 'theme', new NullBackend('test'), new InfoParser($this->root), $module_handler->reveal(), $state, $config_factory, $theme_engine_list->reveal(), 'test');
 
     $base_themes = $theme_listing->getBaseThemes($themes, $theme);
 
@@ -257,8 +256,4 @@ class TestThemeEngineExtensionList extends ThemeEngineExtensionList {
 
   use SettableDiscoveryExtensionListTrait;
 
-}
-
-if (!defined('DRUPAL_MINIMUM_PHP')) {
-  define('DRUPAL_MINIMUM_PHP', '5.5.9');
 }

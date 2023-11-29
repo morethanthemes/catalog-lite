@@ -21,19 +21,19 @@ class ViewsLocalTaskTest extends UnitTestCase {
   /**
    * The mocked route provider.
    *
-   * @var \Drupal\Core\Routing\RouteProviderInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Routing\RouteProviderInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $routeProvider;
 
   /**
    * The mocked key value storage.
    *
-   * @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $state;
 
   /**
-   * @var \Drupal\Core\Entity\EntityStorageInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Entity\EntityStorageInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $viewStorage;
 
@@ -49,10 +49,15 @@ class ViewsLocalTaskTest extends UnitTestCase {
    */
   protected $localTaskDerivative;
 
-  protected function setUp() {
-    $this->routeProvider = $this->getMock('Drupal\Core\Routing\RouteProviderInterface');
-    $this->state = $this->getMock('Drupal\Core\State\StateInterface');
-    $this->viewStorage = $this->getMock('Drupal\Core\Entity\EntityStorageInterface');
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
+    parent::setUp();
+
+    $this->routeProvider = $this->createMock('Drupal\Core\Routing\RouteProviderInterface');
+    $this->state = $this->createMock('Drupal\Core\State\StateInterface');
+    $this->viewStorage = $this->createMock('Drupal\Core\Entity\EntityStorageInterface');
 
     $this->localTaskDerivative = new TestViewsLocalTask($this->routeProvider, $this->state, $this->viewStorage);
   }
@@ -78,13 +83,13 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
     $display_plugin = $this->getMockBuilder('Drupal\views\Plugin\views\display\PathPluginBase')
-      ->setMethods(['getOption'])
+      ->onlyMethods(['getOption'])
       ->disableOriginalConstructor()
       ->getMockForAbstractClass();
     $display_plugin->expects($this->once())
       ->method('getOption')
       ->with('menu')
-      ->will($this->returnValue(['type' => 'normal']));
+      ->willReturn(['type' => 'normal']);
     $executable->display_handler = $display_plugin;
 
     $storage = $this->getMockBuilder('Drupal\views\Entity\View')
@@ -92,7 +97,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->getMock();
     $storage->expects($this->any())
       ->method('id')
-      ->will($this->returnValue('example_view'));
+      ->willReturn('example_view');
     $storage->expects($this->any())
       ->method('getExecutable')
       ->willReturn($executable);
@@ -121,7 +126,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->getMock();
     $storage->expects($this->any())
       ->method('id')
-      ->will($this->returnValue('example_view'));
+      ->willReturn('example_view');
     $storage->expects($this->any())
       ->method('getExecutable')
       ->willReturn($executable);
@@ -133,13 +138,17 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->willReturn($storage);
 
     $display_plugin = $this->getMockBuilder('Drupal\views\Plugin\views\display\PathPluginBase')
-      ->setMethods(['getOption'])
+      ->onlyMethods(['getOption'])
       ->disableOriginalConstructor()
       ->getMockForAbstractClass();
     $display_plugin->expects($this->once())
       ->method('getOption')
       ->with('menu')
-      ->will($this->returnValue(['type' => 'tab', 'weight' => 12, 'title' => 'Example title']));
+      ->willReturn([
+        'type' => 'tab',
+        'weight' => 12,
+        'title' => 'Example title',
+      ]);
     $executable->display_handler = $display_plugin;
 
     $result = [['example_view', 'page_1']];
@@ -151,7 +160,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
     $this->state->expects($this->once())
       ->method('get')
       ->with('views.view_route_names')
-      ->will($this->returnValue($view_route_names));
+      ->willReturn($view_route_names);
 
     $definitions = $this->localTaskDerivative->getDerivativeDefinitions($this->baseDefinition);
     $this->assertCount(1, $definitions);
@@ -159,7 +168,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
     $this->assertEquals(12, $definitions['view.example_view.page_1']['weight']);
     $this->assertEquals('Example title', $definitions['view.example_view.page_1']['title']);
     $this->assertEquals($this->baseDefinition['class'], $definitions['view.example_view.page_1']['class']);
-    $this->assertTrue(empty($definitions['view.example_view.page_1']['base_route']));
+    $this->assertArrayNotHasKey('base_route', $definitions['view.example_view.page_1']);
   }
 
   /**
@@ -174,7 +183,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->getMock();
     $storage->expects($this->any())
       ->method('id')
-      ->will($this->returnValue('example_view'));
+      ->willReturn('example_view');
     $storage->expects($this->any())
       ->method('getExecutable')
       ->willReturn($executable);
@@ -186,13 +195,13 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->willReturn($storage);
 
     $display_plugin = $this->getMockBuilder('Drupal\views\Plugin\views\display\PathPluginBase')
-      ->setMethods(['getOption'])
+      ->onlyMethods(['getOption'])
       ->disableOriginalConstructor()
       ->getMockForAbstractClass();
     $display_plugin->expects($this->once())
       ->method('getOption')
       ->with('menu')
-      ->will($this->returnValue(['type' => 'tab', 'weight' => 12]));
+      ->willReturn(['type' => 'tab', 'weight' => 12]);
     $executable->display_handler = $display_plugin;
 
     $result = [['example_view', 'page_1']];
@@ -205,7 +214,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
     $this->state->expects($this->once())
       ->method('get')
       ->with('views.view_route_names')
-      ->will($this->returnValue($view_route_names));
+      ->willReturn($view_route_names);
 
     $definitions = $this->localTaskDerivative->getDerivativeDefinitions($this->baseDefinition);
     $this->assertCount(0, $definitions);
@@ -223,7 +232,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->getMock();
     $storage->expects($this->any())
       ->method('id')
-      ->will($this->returnValue('example_view'));
+      ->willReturn('example_view');
     $storage->expects($this->any())
       ->method('getExecutable')
       ->willReturn($executable);
@@ -235,13 +244,17 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->willReturn($storage);
 
     $display_plugin = $this->getMockBuilder('Drupal\views\Plugin\views\display\PathPluginBase')
-      ->setMethods(['getOption'])
+      ->onlyMethods(['getOption'])
       ->disableOriginalConstructor()
       ->getMockForAbstractClass();
     $display_plugin->expects($this->exactly(2))
       ->method('getOption')
       ->with('menu')
-      ->will($this->returnValue(['type' => 'default tab', 'weight' => 12, 'title' => 'Example title']));
+      ->willReturn([
+        'type' => 'default tab',
+        'weight' => 12,
+        'title' => 'Example title',
+      ]);
     $executable->display_handler = $display_plugin;
 
     $result = [['example_view', 'page_1']];
@@ -253,7 +266,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
     $this->state->expects($this->exactly(2))
       ->method('get')
       ->with('views.view_route_names')
-      ->will($this->returnValue($view_route_names));
+      ->willReturn($view_route_names);
 
     $definitions = $this->localTaskDerivative->getDerivativeDefinitions($this->baseDefinition);
     $this->assertCount(1, $definitions);
@@ -292,7 +305,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->getMock();
     $storage->expects($this->any())
       ->method('id')
-      ->will($this->returnValue('example_view'));
+      ->willReturn('example_view');
     $storage->expects($this->any())
       ->method('getExecutable')
       ->willReturn($executable);
@@ -304,16 +317,20 @@ class ViewsLocalTaskTest extends UnitTestCase {
       ->willReturn($storage);
 
     $display_plugin = $this->getMockBuilder('Drupal\views\Plugin\views\display\PathPluginBase')
-      ->setMethods(['getOption', 'getPath'])
+      ->onlyMethods(['getOption', 'getPath'])
       ->disableOriginalConstructor()
       ->getMockForAbstractClass();
     $display_plugin->expects($this->exactly(2))
       ->method('getOption')
       ->with('menu')
-      ->will($this->returnValue(['type' => 'tab', 'weight' => 12, 'title' => 'Example title']));
+      ->willReturn([
+        'type' => 'tab',
+        'weight' => 12,
+        'title' => 'Example title',
+      ]);
     $display_plugin->expects($this->once())
       ->method('getPath')
-      ->will($this->returnValue('path/example'));
+      ->willReturn('path/example');
     $executable->display_handler = $display_plugin;
 
     $result = [['example_view', 'page_1']];
@@ -325,7 +342,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
     $this->state->expects($this->exactly(2))
       ->method('get')
       ->with('views.view_route_names')
-      ->will($this->returnValue($view_route_names));
+      ->willReturn($view_route_names);
 
     // Mock the route provider.
     $route_collection = new RouteCollection();
@@ -333,7 +350,7 @@ class ViewsLocalTaskTest extends UnitTestCase {
     $this->routeProvider->expects($this->any())
       ->method('getRoutesByPattern')
       ->with('/path')
-      ->will($this->returnValue($route_collection));
+      ->willReturn($route_collection);
 
     // Setup the existing local task of the test_route.
     $definitions['test_route_tab'] = $other_tab = [
@@ -368,6 +385,8 @@ class ViewsLocalTaskTest extends UnitTestCase {
  * Replaces the applicable views call for easier testability.
  */
 class TestViewsLocalTask extends ViewsLocalTask {
+
+  protected $result;
 
   /**
    * Sets applicable views result.

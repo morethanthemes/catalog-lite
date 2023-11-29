@@ -10,12 +10,13 @@ use Drupal\KernelTests\FileSystemModuleDiscoveryDataProviderTrait;
  * @group migrate_drupal
  */
 class MigrationProcessTest extends MigrateDrupal7TestBase {
+
   use FileSystemModuleDiscoveryDataProviderTrait;
 
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp(): void {
     self::$modules = array_keys($this->coreModuleListDataProvider());
     parent::setUp();
   }

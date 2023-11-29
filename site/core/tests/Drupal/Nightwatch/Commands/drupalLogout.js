@@ -1,5 +1,5 @@
-import { execSync } from 'child_process';
-import { URL } from 'url';
+const { execSync } = require('child_process');
+const { URL } = require('url');
 
 /**
  * Logs out from a Drupal site.
@@ -18,7 +18,7 @@ exports.command = function drupalLogout({ silent = false } = {}, callback) {
 
   this.drupalRelativeURL('/user/logout');
 
-  this.drupalUserIsLoggedIn(sessionExists => {
+  this.drupalUserIsLoggedIn((sessionExists) => {
     if (silent) {
       if (sessionExists) {
         throw new Error('Logging out failed.');

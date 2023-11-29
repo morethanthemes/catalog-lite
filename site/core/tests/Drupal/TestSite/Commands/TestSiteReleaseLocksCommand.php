@@ -29,9 +29,10 @@ class TestSiteReleaseLocksCommand extends Command {
   /**
    * {@inheritdoc}
    */
-  protected function execute(InputInterface $input, OutputInterface $output) {
+  protected function execute(InputInterface $input, OutputInterface $output): int {
     TestDatabase::releaseAllTestLocks();
     $output->writeln('<info>Successfully released all the test database locks</info>');
+    return 0;
   }
 
 }

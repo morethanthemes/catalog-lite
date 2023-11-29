@@ -2,6 +2,8 @@
 
 namespace Drupal\KernelTests\Core\File;
 
+use Drupal\Core\File\FileSystemInterface;
+
 /**
  * Tests the file_unmanaged_save_data() function.
  *
@@ -10,7 +12,7 @@ namespace Drupal\KernelTests\Core\File;
 class FileSaveDataTest extends FileTestBase {
 
   /**
-   * Test the file_unmanaged_save_data() function.
+   * Tests the file_unmanaged_save_data() function.
    */
   public function testFileSaveData() {
     $contents = $this->randomMachineName(8);
@@ -21,10 +23,10 @@ class FileSaveDataTest extends FileTestBase {
     $file_system = \Drupal::service('file_system');
 
     // Provide a filename.
-    $filepath = $file_system->saveData($contents, 'public://asdf.txt', FILE_EXISTS_REPLACE);
-    $this->assertTrue($filepath, 'Unnamed file saved correctly.');
-    $this->assertEqual('asdf.txt', \Drupal::service('file_system')->basename($filepath), 'File was named correctly.');
-    $this->assertEqual($contents, file_get_contents($filepath), 'Contents of the file are correct.');
+    $filepath = $file_system->saveData($contents, 'public://asdf.txt', FileSystemInterface::EXISTS_REPLACE);
+    $this->assertNotFalse($filepath, 'Unnamed file saved correctly.');
+    $this->assertEquals('asdf.txt', \Drupal::service('file_system')->basename($filepath), 'File was named correctly.');
+    $this->assertEquals($contents, file_get_contents($filepath), 'Contents of the file are correct.');
     $this->assertFilePermissions($filepath, 0777);
   }
 

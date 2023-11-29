@@ -42,15 +42,12 @@ tour.tip:
     weight:
       type: integer
       label: 'Weight'
-    location:
+    position:
       type: string
-      label: 'Location'
-    attributes:
-      type: sequence
-      label: 'Attributes'
-      sequence:
-        type: string
-        label: 'Attribute'
+      label: 'Position'
+    selector:
+      type: string
+      label: 'Selector'
 
 tour.tip.text:
   type: tour.tip

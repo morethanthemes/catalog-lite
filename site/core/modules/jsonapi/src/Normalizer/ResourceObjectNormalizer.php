@@ -3,7 +3,10 @@
 namespace Drupal\jsonapi\Normalizer;
 
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\jsonapi\EventSubscriber\ResourceObjectNormalizationCacher;
+use Drupal\jsonapi\JsonApiResource\Relationship;
 use Drupal\jsonapi\JsonApiResource\ResourceObject;
 use Drupal\jsonapi\Normalizer\Value\CacheableNormalization;
 use Drupal\jsonapi\Normalizer\Value\CacheableOmission;
@@ -14,27 +17,39 @@ use Drupal\jsonapi\Normalizer\Value\CacheableOmission;
  * @internal JSON:API maintains no PHP API since its API is the HTTP API. This
  *   class may change at any time and this will break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  */
 class ResourceObjectNormalizer extends NormalizerBase {
 
   /**
-   * {@inheritdoc}
+   * The entity normalization cacher.
+   *
+   * @var \Drupal\jsonapi\EventSubscriber\ResourceObjectNormalizationCacher
    */
-  protected $supportedInterfaceOrClass = ResourceObject::class;
+  protected $cacher;
+
+  /**
+   * Constructs a ResourceObjectNormalizer object.
+   *
+   * @param \Drupal\jsonapi\EventSubscriber\ResourceObjectNormalizationCacher $cacher
+   *   The entity normalization cacher.
+   */
+  public function __construct(ResourceObjectNormalizationCacher $cacher) {
+    $this->cacher = $cacher;
+  }
 
   /**
    * {@inheritdoc}
    */
-  public function supportsDenormalization($data, $type, $format = NULL) {
+  public function supportsDenormalization($data, string $type, string $format = NULL, array $context = []): bool {
     return FALSE;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function normalize($object, $format = NULL, array $context = []) {
+  public function normalize($object, $format = NULL, array $context = []): array|string|int|float|bool|\ArrayObject|NULL {
     assert($object instanceof ResourceObject);
     // If the fields to use were specified, only output those field values.
     $context['resource_object'] = $object;
@@ -49,23 +64,87 @@ class ResourceObjectNormalizer extends NormalizerBase {
     else {
       $field_names = array_keys($fields);
     }
-    $normalizer_values = [];
-    foreach ($fields as $field_name => $field) {
-      $in_sparse_fieldset = in_array($field_name, $field_names);
-      // Omit fields not listed in sparse fieldsets.
-      if (!$in_sparse_fieldset) {
-        continue;
-      }
-      $normalizer_values[$field_name] = $this->serializeField($field, $context, $format);
-    }
+
+    $normalization_parts = $this->getNormalization($field_names, $object, $format, $context);
+
+    // Keep only the requested fields (the cached normalization gradually grows
+    // to the complete set of fields).
+    $fields = $normalization_parts[ResourceObjectNormalizationCacher::RESOURCE_CACHE_SUBSET_FIELDS];
+    $field_normalizations = array_intersect_key($fields, array_flip($field_names));
+
     $relationship_field_names = array_keys($resource_type->getRelatableResourceTypes());
-    return CacheableNormalization::aggregate([
-      'type' => CacheableNormalization::permanent($resource_type->getTypeName()),
-      'id' => CacheableNormalization::permanent($object->getId()),
-      'attributes' => CacheableNormalization::aggregate(array_diff_key($normalizer_values, array_flip($relationship_field_names)))->omitIfEmpty(),
-      'relationships' => CacheableNormalization::aggregate(array_intersect_key($normalizer_values, array_flip($relationship_field_names)))->omitIfEmpty(),
-      'links' => $this->serializer->normalize($object->getLinks(), $format, $context)->omitIfEmpty(),
-    ])->withCacheableDependency($object);
+    $attributes = array_diff_key($field_normalizations, array_flip($relationship_field_names));
+    $relationships = array_intersect_key($field_normalizations, array_flip($relationship_field_names));
+    $entity_normalization = array_filter(
+      $normalization_parts[ResourceObjectNormalizationCacher::RESOURCE_CACHE_SUBSET_BASE] + [
+        'attributes' => CacheableNormalization::aggregate($attributes)->omitIfEmpty(),
+        'relationships' => CacheableNormalization::aggregate($relationships)->omitIfEmpty(),
+      ]
+    );
+    return CacheableNormalization::aggregate($entity_normalization)->withCacheableDependency($object);
+  }
+
+  /**
+   * Normalizes an entity using the given fieldset.
+   *
+   * @param string[] $field_names
+   *   The field names to normalize (the sparse fieldset, if any).
+   * @param \Drupal\jsonapi\JsonApiResource\ResourceObject $object
+   *   The resource object to partially normalize.
+   * @param string $format
+   *   The format in which the normalization will be encoded.
+   * @param array $context
+   *   Context options for the normalizer.
+   *
+   * @return array
+   *   An array with two key-value pairs:
+   *   - 'base': array, the base normalization of the entity, that does not
+   *             depend on which sparse fieldset was requested.
+   *   - 'fields': CacheableNormalization for all requested fields.
+   *
+   * @see ::normalize()
+   */
+  protected function getNormalization(array $field_names, ResourceObject $object, $format = NULL, array $context = []) {
+    $cached_normalization_parts = $this->cacher->get($object);
+    $normalizer_values = $cached_normalization_parts !== FALSE
+      ? $cached_normalization_parts
+      : static::buildEmptyNormalization($object);
+    $fields = &$normalizer_values[ResourceObjectNormalizationCacher::RESOURCE_CACHE_SUBSET_FIELDS];
+    $non_cached_fields = array_diff_key($object->getFields(), $fields);
+    $non_cached_requested_fields = array_intersect_key($non_cached_fields, array_flip($field_names));
+    foreach ($non_cached_requested_fields as $field_name => $field) {
+      $fields[$field_name] = $this->serializeField($field, $context, $format);
+    }
+    // Add links if missing.
+    $base = &$normalizer_values[ResourceObjectNormalizationCacher::RESOURCE_CACHE_SUBSET_BASE];
+    $base['links'] = $base['links'] ?? $this->serializer->normalize($object->getLinks(), $format, $context)->omitIfEmpty();
+
+    if (!empty($non_cached_requested_fields)) {
+      $this->cacher->saveOnTerminate($object, $normalizer_values);
+    }
+
+    return $normalizer_values;
+  }
+
+  /**
+   * Builds the empty normalization structure for cache misses.
+   *
+   * @param \Drupal\jsonapi\JsonApiResource\ResourceObject $object
+   *   The resource object being normalized.
+   *
+   * @return array
+   *   The normalization structure as defined in ::getNormalization().
+   *
+   * @see ::getNormalization()
+   */
+  protected static function buildEmptyNormalization(ResourceObject $object) {
+    return [
+      ResourceObjectNormalizationCacher::RESOURCE_CACHE_SUBSET_BASE => [
+        'type' => CacheableNormalization::permanent($object->getResourceType()->getTypeName()),
+        'id' => CacheableNormalization::permanent($object->getId()),
+      ],
+      ResourceObjectNormalizationCacher::RESOURCE_CACHE_SUBSET_FIELDS => [],
+    ];
   }
 
   /**
@@ -90,7 +169,17 @@ class ResourceObjectNormalizer extends NormalizerBase {
       if (!$field_access_result->isAllowed()) {
         return new CacheableOmission(CacheableMetadata::createFromObject($field_access_result));
       }
-      $normalized_field = $this->serializer->normalize($field, $format, $context);
+      if ($field instanceof EntityReferenceFieldItemListInterface) {
+        // Build the relationship object based on the entity reference and
+        // normalize that object instead.
+        assert(!empty($context['resource_object']) && $context['resource_object'] instanceof ResourceObject);
+        $resource_object = $context['resource_object'];
+        $relationship = Relationship::createFromEntityReferenceField($resource_object, $field);
+        $normalized_field = $this->serializer->normalize($relationship, $format, $context);
+      }
+      else {
+        $normalized_field = $this->serializer->normalize($field, $format, $context);
+      }
       assert($normalized_field instanceof CacheableNormalization);
       return $normalized_field->withCacheableDependency(CacheableMetadata::createFromObject($field_access_result));
     }
@@ -98,7 +187,7 @@ class ResourceObjectNormalizer extends NormalizerBase {
       // @todo Replace this workaround after https://www.drupal.org/node/3043245
       //   or remove the need for this in https://www.drupal.org/node/2942975.
       //   See \Drupal\layout_builder\Normalizer\LayoutEntityDisplayNormalizer.
-      if ($context['resource_object']->getResourceType()->getDeserializationTargetClass() === 'Drupal\layout_builder\Entity\LayoutBuilderEntityViewDisplay' && $context['resource_object']->getField('third_party_settings') === $field) {
+      if (is_a($context['resource_object']->getResourceType()->getDeserializationTargetClass(), 'Drupal\layout_builder\Entity\LayoutBuilderEntityViewDisplay', TRUE) && $context['resource_object']->getField('third_party_settings') === $field) {
         unset($field['layout_builder']['sections']);
       }
 
@@ -106,6 +195,24 @@ class ResourceObjectNormalizer extends NormalizerBase {
       // to be normalized.
       return CacheableNormalization::permanent($field);
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasCacheableSupportsMethod(): bool {
+    @trigger_error(__METHOD__ . '() is deprecated in drupal:10.1.0 and is removed from drupal:11.0.0. Use getSupportedTypes() instead. See https://www.drupal.org/node/3359695', E_USER_DEPRECATED);
+
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSupportedTypes(?string $format): array {
+    return [
+      ResourceObject::class => TRUE,
+    ];
   }
 
 }

@@ -3,7 +3,9 @@
 namespace Drupal\Tests\Core\Config;
 
 use Drupal\Component\Uuid\Php;
+use Drupal\Core\Config\MemoryStorage;
 use Drupal\Core\Config\StorageComparer;
+use Drupal\Core\Config\StorageInterface;
 use Drupal\Tests\UnitTestCase;
 
 /**
@@ -13,12 +15,12 @@ use Drupal\Tests\UnitTestCase;
 class StorageComparerTest extends UnitTestCase {
 
   /**
-   * @var \Drupal\Core\Config\StorageInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Config\StorageInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $sourceStorage;
 
   /**
-   * @var \Drupal\Core\Config\StorageInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Config\StorageInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $targetStorage;
 
@@ -36,9 +38,22 @@ class StorageComparerTest extends UnitTestCase {
    */
   protected $configData;
 
-  protected function setUp() {
-    $this->sourceStorage = $this->getMock('Drupal\Core\Config\StorageInterface');
-    $this->targetStorage = $this->getMock('Drupal\Core\Config\StorageInterface');
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
+    parent::setUp();
+
+    $this->sourceStorage = $this->createMock('Drupal\Core\Config\StorageInterface');
+    $this->targetStorage = $this->createMock('Drupal\Core\Config\StorageInterface');
+
+    $this->sourceStorage->expects($this->atLeastOnce())
+      ->method('getCollectionName')
+      ->will($this->returnValue(StorageInterface::DEFAULT_COLLECTION));
+    $this->targetStorage->expects($this->atLeastOnce())
+      ->method('getCollectionName')
+      ->will($this->returnValue(StorageInterface::DEFAULT_COLLECTION));
+
     $this->storageComparer = new StorageComparer($this->sourceStorage, $this->targetStorage);
   }
 
@@ -98,22 +113,22 @@ class StorageComparerTest extends UnitTestCase {
     $config_files = array_keys($config_data);
     $this->sourceStorage->expects($this->once())
       ->method('listAll')
-      ->will($this->returnValue($config_files));
+      ->willReturn($config_files);
     $this->targetStorage->expects($this->once())
       ->method('listAll')
-      ->will($this->returnValue($config_files));
+      ->willReturn($config_files);
     $this->sourceStorage->expects($this->once())
       ->method('readMultiple')
-      ->will($this->returnValue($config_data));
+      ->willReturn($config_data);
     $this->targetStorage->expects($this->once())
       ->method('readMultiple')
-      ->will($this->returnValue($config_data));
+      ->willReturn($config_data);
     $this->sourceStorage->expects($this->once())
       ->method('getAllCollectionNames')
-      ->will($this->returnValue([]));
+      ->willReturn([]);
     $this->targetStorage->expects($this->once())
       ->method('getAllCollectionNames')
-      ->will($this->returnValue([]));
+      ->willReturn([]);
 
     $this->storageComparer->createChangelist();
     $this->assertEmpty($this->storageComparer->getChangelist('create'));
@@ -132,22 +147,22 @@ class StorageComparerTest extends UnitTestCase {
 
     $this->sourceStorage->expects($this->once())
       ->method('listAll')
-      ->will($this->returnValue(array_keys($source_data)));
+      ->willReturn(array_keys($source_data));
     $this->targetStorage->expects($this->once())
       ->method('listAll')
-      ->will($this->returnValue(array_keys($target_data)));
+      ->willReturn(array_keys($target_data));
     $this->sourceStorage->expects($this->once())
       ->method('readMultiple')
-      ->will($this->returnValue($source_data));
+      ->willReturn($source_data);
     $this->targetStorage->expects($this->once())
       ->method('readMultiple')
-      ->will($this->returnValue($target_data));
+      ->willReturn($target_data);
     $this->sourceStorage->expects($this->once())
       ->method('getAllCollectionNames')
-      ->will($this->returnValue([]));
+      ->willReturn([]);
     $this->targetStorage->expects($this->once())
       ->method('getAllCollectionNames')
-      ->will($this->returnValue([]));
+      ->willReturn([]);
 
     $this->storageComparer->createChangelist();
     $expected = [
@@ -171,22 +186,22 @@ class StorageComparerTest extends UnitTestCase {
 
     $this->sourceStorage->expects($this->once())
       ->method('listAll')
-      ->will($this->returnValue(array_keys($source_data)));
+      ->willReturn(array_keys($source_data));
     $this->targetStorage->expects($this->once())
       ->method('listAll')
-      ->will($this->returnValue(array_keys($target_data)));
+      ->willReturn(array_keys($target_data));
     $this->sourceStorage->expects($this->once())
       ->method('readMultiple')
-      ->will($this->returnValue($source_data));
+      ->willReturn($source_data);
     $this->targetStorage->expects($this->once())
       ->method('readMultiple')
-      ->will($this->returnValue($target_data));
+      ->willReturn($target_data);
     $this->sourceStorage->expects($this->once())
       ->method('getAllCollectionNames')
-      ->will($this->returnValue([]));
+      ->willReturn([]);
     $this->targetStorage->expects($this->once())
       ->method('getAllCollectionNames')
-      ->will($this->returnValue([]));
+      ->willReturn([]);
 
     $this->storageComparer->createChangelist();
     $expected = [
@@ -210,22 +225,22 @@ class StorageComparerTest extends UnitTestCase {
 
     $this->sourceStorage->expects($this->once())
       ->method('listAll')
-      ->will($this->returnValue(array_keys($source_data)));
+      ->willReturn(array_keys($source_data));
     $this->targetStorage->expects($this->once())
       ->method('listAll')
-      ->will($this->returnValue(array_keys($target_data)));
+      ->willReturn(array_keys($target_data));
     $this->sourceStorage->expects($this->once())
       ->method('readMultiple')
-      ->will($this->returnValue($source_data));
+      ->willReturn($source_data);
     $this->targetStorage->expects($this->once())
       ->method('readMultiple')
-      ->will($this->returnValue($target_data));
+      ->willReturn($target_data);
     $this->sourceStorage->expects($this->once())
       ->method('getAllCollectionNames')
-      ->will($this->returnValue([]));
+      ->willReturn([]);
     $this->targetStorage->expects($this->once())
       ->method('getAllCollectionNames')
-      ->will($this->returnValue([]));
+      ->willReturn([]);
 
     $this->storageComparer->createChangelist();
     $expected = [
@@ -239,12 +254,55 @@ class StorageComparerTest extends UnitTestCase {
   }
 
   /**
-   * @expectedDeprecation The storage comparer does not need a config manager. The parameter is deprecated since version 8.7.0 and will be removed in 9.0.0. Omit the third parameter. See https://www.drupal.org/node/2993271.
-   * @group legacy
+   * @covers ::createChangelist
    */
-  public function testConfigManagerDeprecation() {
-    $configManager = $this->getMock('Drupal\Core\Config\ConfigManagerInterface');
-    new StorageComparer($this->sourceStorage, $this->targetStorage, $configManager);
+  public function testDifferentCollections() {
+    $source = new MemoryStorage();
+    $target = new MemoryStorage();
+
+    $this->generateRandomData($source, 's');
+    $this->generateRandomData($target, 't');
+
+    // Use random collections for source and target.
+    $collections = $source->getAllCollectionNames();
+    $source = $source->createCollection($collections[array_rand($collections)]);
+    $collections = $target->getAllCollectionNames();
+    $target = $target->createCollection($collections[array_rand($collections)]);
+
+    $comparer = new StorageComparer($source, $target);
+    $comparer->createChangelist();
+
+    foreach (array_merge([StorageInterface::DEFAULT_COLLECTION], $source->getAllCollectionNames(), $target->getAllCollectionNames()) as $collection) {
+      $expected = [
+        'create' => $source->createCollection($collection)->listAll(),
+        'update' => [],
+        'delete' => $target->createCollection($collection)->listAll(),
+        'rename' => [],
+      ];
+
+      $this->assertEqualsCanonicalizing($expected, $comparer->getChangelist(NULL, $collection));
+    }
+  }
+
+  /**
+   * Generate random data in a config storage.
+   *
+   * @param \Drupal\Core\Config\StorageInterface $storage
+   *   The storage to populate with random data.
+   * @param string $prefix
+   *   The prefix for random names to make sure they are unique.
+   */
+  protected function generateRandomData(StorageInterface $storage, string $prefix = '') {
+    $generator = $this->getRandomGenerator();
+    for ($i = 0; $i < rand(2, 10); $i++) {
+      $storage->write($prefix . $this->randomMachineName(), (array) $generator->object());
+    }
+    for ($i = 0; $i < rand(1, 5); $i++) {
+      $collection = $storage->createCollection($prefix . $this->randomMachineName());
+      for ($i = 0; $i < rand(2, 10); $i++) {
+        $collection->write($prefix . $this->randomMachineName(), (array) $generator->object());
+      }
+    }
   }
 
 }

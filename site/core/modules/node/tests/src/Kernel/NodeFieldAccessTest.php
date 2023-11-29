@@ -19,7 +19,7 @@ class NodeFieldAccessTest extends EntityKernelTestBase {
    *
    * @var array
    */
-  public static $modules = ['node'];
+  protected static $modules = ['node'];
 
   /**
    * Fields that only users with administer nodes permissions can change.
@@ -42,18 +42,18 @@ class NodeFieldAccessTest extends EntityKernelTestBase {
   protected $readOnlyFields = ['changed', 'revision_uid', 'revision_timestamp'];
 
   /**
-   * Test permissions on nodes status field.
+   * Tests permissions on nodes status field.
    */
   public function testAccessToAdministrativeFields() {
 
     // Create the page node type with revisions disabled.
     $page = NodeType::create([
       'type' => 'page',
-        'new_revision' => FALSE,
+      'new_revision' => FALSE,
     ]);
     $page->save();
 
-    // Create the article node type with revisions disabled.
+    // Create the article node type with revisions enabled.
     $article = NodeType::create([
       'type' => 'article',
       'new_revision' => TRUE,
@@ -62,14 +62,14 @@ class NodeFieldAccessTest extends EntityKernelTestBase {
 
     // An administrator user. No user exists yet, ensure that the first user
     // does not have UID 1.
-    $content_admin_user = $this->createUser(['uid' => 2], ['administer nodes']);
+    $content_admin_user = $this->createUser(['administer nodes'], NULL, FALSE, ['uid' => 2]);
 
     // Two different editor users.
-    $page_creator_user = $this->createUser([], ['create page content', 'edit own page content', 'delete own page content']);
-    $page_manager_user = $this->createUser([], ['create page content', 'edit any page content', 'delete any page content']);
+    $page_creator_user = $this->createUser(['create page content', 'edit own page content', 'delete own page content']);
+    $page_manager_user = $this->createUser(['create page content', 'edit any page content', 'delete any page content']);
 
     // An unprivileged user.
-    $page_unrelated_user = $this->createUser([], ['access content']);
+    $page_unrelated_user = $this->createUser(['access content']);
 
     // List of all users
     $test_users = [

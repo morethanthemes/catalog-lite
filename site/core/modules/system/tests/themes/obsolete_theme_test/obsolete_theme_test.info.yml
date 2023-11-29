@@ -1,0 +1,12 @@
+name: 'Obsolete theme test'
+type: theme
+description: 'Obsolete test theme.'
+# version: VERSION
+lifecycle: obsolete
+lifecycle_link: 'https://example.com/obsolete'
+base theme: false
+
+# Information added by Drupal.org packaging script on 2023-11-01
+version: '10.1.6'
+project: 'drupal'
+datestamp: 1698841355

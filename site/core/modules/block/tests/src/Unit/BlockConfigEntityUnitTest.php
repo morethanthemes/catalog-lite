@@ -18,14 +18,14 @@ class BlockConfigEntityUnitTest extends UnitTestCase {
   /**
    * The entity type used for testing.
    *
-   * @var \Drupal\Core\Entity\EntityTypeInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Entity\EntityTypeInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $entityType;
 
   /**
    * The entity type manager used for testing.
    *
-   * @var \Drupal\Core\Entity\EntityTypeManagerInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $entityTypeManager;
 
@@ -39,7 +39,7 @@ class BlockConfigEntityUnitTest extends UnitTestCase {
   /**
    * The UUID generator used for testing.
    *
-   * @var \Drupal\Component\Uuid\UuidInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Component\Uuid\UuidInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $uuid;
 
@@ -60,21 +60,23 @@ class BlockConfigEntityUnitTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
+    parent::setUp();
+
     $this->entityTypeId = $this->randomMachineName();
 
-    $this->entityType = $this->getMock('\Drupal\Core\Entity\EntityTypeInterface');
+    $this->entityType = $this->createMock('\Drupal\Core\Entity\EntityTypeInterface');
     $this->entityType->expects($this->any())
       ->method('getProvider')
-      ->will($this->returnValue('block'));
+      ->willReturn('block');
 
-    $this->entityTypeManager = $this->getMock(EntityTypeManagerInterface::class);
+    $this->entityTypeManager = $this->createMock(EntityTypeManagerInterface::class);
     $this->entityTypeManager->expects($this->any())
       ->method('getDefinition')
       ->with($this->entityTypeId)
-      ->will($this->returnValue($this->entityType));
+      ->willReturn($this->entityType);
 
-    $this->uuid = $this->getMock('\Drupal\Component\Uuid\UuidInterface');
+    $this->uuid = $this->createMock('\Drupal\Component\Uuid\UuidInterface');
 
     $this->moduleHandler = $this->prophesize(ModuleHandlerInterface::class);
     $this->themeHandler = $this->prophesize(ThemeHandlerInterface::class);
@@ -96,7 +98,7 @@ class BlockConfigEntityUnitTest extends UnitTestCase {
     // Mock the entity under test so that we can mock getPluginCollections().
     $entity = $this->getMockBuilder('\Drupal\block\Entity\Block')
       ->setConstructorArgs([$values, $this->entityTypeId])
-      ->setMethods(['getPluginCollections'])
+      ->onlyMethods(['getPluginCollections'])
       ->getMock();
     // Create a configurable plugin that would add a dependency.
     $instance_id = $this->randomMachineName();
@@ -106,18 +108,18 @@ class BlockConfigEntityUnitTest extends UnitTestCase {
     // Create a plugin collection to contain the instance.
     $plugin_collection = $this->getMockBuilder('\Drupal\Core\Plugin\DefaultLazyPluginCollection')
       ->disableOriginalConstructor()
-      ->setMethods(['get'])
+      ->onlyMethods(['get'])
       ->getMock();
     $plugin_collection->expects($this->atLeastOnce())
       ->method('get')
       ->with($instance_id)
-      ->will($this->returnValue($instance));
+      ->willReturn($instance);
     $plugin_collection->addInstanceId($instance_id);
 
     // Return the mocked plugin collection.
     $entity->expects($this->once())
       ->method('getPluginCollections')
-      ->will($this->returnValue([$plugin_collection]));
+      ->willReturn([$plugin_collection]);
 
     $dependencies = $entity->calculateDependencies()->getDependencies();
     $this->assertContains('test', $dependencies['module']);

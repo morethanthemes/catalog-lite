@@ -22,7 +22,6 @@ class ThemeExtensionList extends ExtensionList {
    */
   protected $defaults = [
     'engine' => 'twig',
-    'base theme' => 'stable',
     'regions' => [
       'sidebar_first' => 'Left sidebar',
       'sidebar_second' => 'Right sidebar',
@@ -48,10 +47,12 @@ class ThemeExtensionList extends ExtensionList {
       'comment_user_verification',
     ],
     'screenshot' => 'screenshot.png',
-    'php' => DRUPAL_MINIMUM_PHP,
+    'version' => NULL,
+    'php' => \Drupal::MINIMUM_PHP,
     'libraries' => [],
     'libraries_extend' => [],
     'libraries_override' => [],
+    'dependencies' => [],
   ];
 
   /**
@@ -141,6 +142,22 @@ class ThemeExtensionList extends ExtensionList {
     // sub-themes.
     $this->fillInSubThemeData($themes, $sub_themes);
 
+    foreach ($themes as $theme) {
+      // After $theme is processed by buildModuleDependencies(), there can be a
+      // `$theme->requires` array containing both module and base theme
+      // dependencies. The module dependencies are copied to their own property
+      // so they are available to operations specific to module dependencies.
+      if (isset($theme->requires)) {
+        $theme->module_dependencies = array_diff_key($theme->requires, $themes);
+      }
+      else {
+        // Even if no requirements are specified, the theme installation process
+        // expects the presence of the `requires` and `module_dependencies`
+        // properties, so they should be initialized here as empty arrays.
+        $theme->requires = [];
+        $theme->module_dependencies = [];
+      }
+    }
     return $themes;
   }
 
@@ -247,8 +264,13 @@ class ThemeExtensionList extends ExtensionList {
    */
   protected function createExtensionInfo(Extension $extension) {
     $info = parent::createExtensionInfo($extension);
-    // Remove the default Stable base theme when 'base theme: false' is set in
-    // a theme .info.yml file.
+
+    if (!isset($info['base theme'])) {
+      throw new InfoParserException(sprintf('Missing required key ("base theme") in %s, see https://www.drupal.org/node/3066038', $extension->getPathname()));
+    }
+
+    // Remove the base theme when 'base theme: false' is set in a theme
+    // .info.yml file.
     if ($info['base theme'] === FALSE) {
       unset($info['base theme']);
     }

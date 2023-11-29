@@ -45,7 +45,7 @@ class DateTimeIso8601NormalizerTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $system_date_config = $this->prophesize(ImmutableConfig::class);
@@ -211,27 +211,13 @@ class DateTimeIso8601NormalizerTest extends UnitTestCase {
   }
 
   /**
-   * Tests the denormalize function with the date+time deprecated format.
-   *
-   * @covers ::denormalize
-   * @group legacy
-   * @expectedDeprecation The provided datetime string format (Y-m-d\TH:i:s) is deprecated and will be removed before Drupal 9.0.0. Use the RFC3339 format instead (Y-m-d\TH:i:sP).
-   */
-  public function testDenormalizeDateAndTimeDeprecatedFormat() {
-    $normalized = '2016-11-06T08:00:00';
-
-    $field_definition = $this->prophesize(FieldDefinitionInterface::class);
-    $field_definition->getSetting('datetime_type')->willReturn(DateTimeItem::DATETIME_TYPE_DATETIME);
-    $this->normalizer->denormalize($normalized, DateTimeIso8601::class, NULL, ['field_definition' => $field_definition->reveal()]);
-  }
-
-  /**
    * Tests the denormalize function with bad data for the date-only case.
    *
    * @covers ::denormalize
    */
   public function testDenormalizeDateOnlyException() {
-    $this->setExpectedException(UnexpectedValueException::class, 'The specified date "2016/11/06" is not in an accepted format: "Y-m-d" (date-only).');
+    $this->expectException(UnexpectedValueException::class);
+    $this->expectExceptionMessage('The specified date "2016/11/06" is not in an accepted format: "Y-m-d" (date-only).');
 
     $normalized = '2016/11/06';
 
@@ -246,7 +232,8 @@ class DateTimeIso8601NormalizerTest extends UnitTestCase {
    * @covers ::denormalize
    */
   public function testDenormalizeDateAndTimeException() {
-    $this->setExpectedException(UnexpectedValueException::class, 'The specified date "on a rainy day" is not in an accepted format: "Y-m-d\TH:i:sP" (RFC 3339), "Y-m-d\TH:i:sO" (ISO 8601), "Y-m-d\TH:i:s" (backward compatibility — deprecated).');
+    $this->expectException(UnexpectedValueException::class);
+    $this->expectExceptionMessage('The specified date "on a rainy day" is not in an accepted format: "Y-m-d\TH:i:sP" (RFC 3339), "Y-m-d\TH:i:sO" (ISO 8601).');
 
     $normalized = 'on a rainy day';
 
@@ -261,13 +248,16 @@ class DateTimeIso8601NormalizerTest extends UnitTestCase {
    * @covers ::denormalize
    */
   public function testDenormalizeNoTargetInstanceOrFieldDefinitionException() {
-    $this->setExpectedException(InvalidArgumentException::class, '$context[\'target_instance\'] or $context[\'field_definition\'] must be set to denormalize with the DateTimeIso8601Normalizer');
+    $this->expectException(InvalidArgumentException::class);
+    $this->expectExceptionMessage('$context[\'target_instance\'] or $context[\'field_definition\'] must be set to denormalize with the DateTimeIso8601Normalizer');
     $this->normalizer->denormalize('', DateTimeIso8601::class, NULL, []);
   }
 
 }
 
 /**
+ * Provides a test class for testing DrupalDateTime.
+ *
  * Note: Prophecy does not support magic methods. By subclassing and specifying
  * an explicit method, Prophecy works.
  * @see https://github.com/phpspec/prophecy/issues/338

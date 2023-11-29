@@ -3,6 +3,7 @@
 namespace Drupal\Core\Config;
 
 use Drupal\Component\FileCache\FileCacheFactory;
+use Drupal\Component\FileSecurity\FileSecurity;
 use Drupal\Component\Serialization\Exception\InvalidDataTypeException;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Serialization\Yaml;
@@ -79,7 +80,7 @@ class FileStorage implements StorageInterface {
     $success = $this->getFileSystem()->prepareDirectory($dir, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
     // Only create .htaccess file in root directory.
     if ($dir == $this->directory) {
-      $success = $success && file_save_htaccess($this->directory, TRUE, TRUE);
+      $success = $success && FileSecurity::writeHtaccess($this->directory);
     }
     if (!$success) {
       throw new StorageException('Failed to create config directory ' . $dir);
@@ -114,7 +115,7 @@ class FileStorage implements StorageInterface {
       $data = $this->decode($data);
     }
     catch (InvalidDataTypeException $e) {
-      throw new UnsupportedDataTypeConfigException('Invalid data type in config ' . $name . ', found in file' . $filepath . ' : ' . $e->getMessage());
+      throw new UnsupportedDataTypeConfigException('Invalid data type in config ' . $name . ', found in file ' . $filepath . ': ' . $e->getMessage());
     }
     $this->fileCache->set($filepath, $data);
 
@@ -153,10 +154,7 @@ class FileStorage implements StorageInterface {
       $status = @file_put_contents($target, $encoded_data);
     }
     if ($status === FALSE) {
-      throw new StorageException('Failed to write configuration file: ' . $this->getFilePath($name));
-    }
-    else {
-      $this->getFileSystem()->chmod($target);
+      throw new StorageException('Failed to write configuration file: ' . $target);
     }
 
     $this->fileCache->set($target, $data);

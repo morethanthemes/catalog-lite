@@ -17,7 +17,7 @@ class LogMessageParser implements LogMessageParserInterface {
       $has_psr3 = TRUE;
       // Transform PSR3 style messages containing placeholders to
       // \Drupal\Component\Render\FormattableMarkup style.
-      $message = preg_replace('/\{(.*)\}/U', '@$1', $message);
+      $message = preg_replace('/\{([^\{}]*)\}/U', '@$1', $message);
     }
     foreach ($context as $key => $variable) {
       // PSR3 style placeholders.
@@ -25,11 +25,11 @@ class LogMessageParser implements LogMessageParserInterface {
         // Keys are not prefixed with anything according to PSR3 specs.
         // If the message is "User {username} created" the variable key will be
         // just "username".
-        if (strpos($message, '@' . $key) !== FALSE) {
+        if (str_contains($message, '@' . $key)) {
           $key = '@' . $key;
         }
       }
-      if (!empty($key) && ($key[0] === '@' || $key[0] === '%' || $key[0] === '!')) {
+      if (!empty($key) && ($key[0] === '@' || $key[0] === '%' || $key[0] === ':')) {
         // The key is now in \Drupal\Component\Render\FormattableMarkup style.
         $variables[$key] = $variable;
       }

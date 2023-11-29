@@ -8,10 +8,10 @@ use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\layout_builder\Section;
 use Drupal\layout_builder\SectionListInterface;
-use Drupal\layout_builder\SectionStorage\SectionStorageTrait;
+use Drupal\layout_builder\SectionListTrait;
 
 /**
- * Defines a item list class for layout section fields.
+ * Defines an item list class for layout section fields.
  *
  * @internal
  *   Plugin classes are internal.
@@ -20,14 +20,20 @@ use Drupal\layout_builder\SectionStorage\SectionStorageTrait;
  */
 class LayoutSectionItemList extends FieldItemList implements SectionListInterface {
 
-  use SectionStorageTrait;
+  use SectionListTrait;
+
+  /**
+   * Numerically indexed array of field items.
+   *
+   * @var \Drupal\layout_builder\Plugin\Field\FieldType\LayoutSectionItem[]
+   */
+  protected $list = [];
 
   /**
    * {@inheritdoc}
    */
   public function getSections() {
     $sections = [];
-    /** @var \Drupal\layout_builder\Plugin\Field\FieldType\LayoutSectionItem $item */
     foreach ($this->list as $delta => $item) {
       $sections[$delta] = $item->section;
     }
@@ -58,6 +64,18 @@ class LayoutSectionItemList extends FieldItemList implements SectionListInterfac
     // Ensure the entity is updated with the latest value.
     $entity->set($this->getName(), $this->getValue());
     return $entity;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function preSave() {
+    parent::preSave();
+    // Loop through each section and reconstruct it to ensure that all default
+    // values are present.
+    foreach ($this->list as $item) {
+      $item->section = Section::fromArray($item->section->toArray());
+    }
   }
 
   /**

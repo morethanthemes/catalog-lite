@@ -17,14 +17,14 @@ class MigratePrivateFileTest extends MigrateDrupal7TestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['file'];
+  protected static $modules = ['file'];
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
-    $this->setSetting('file_private_path', $this->container->get('site.path') . '/private');
+    $this->setSetting('file_private_path', $this->container->getParameter('site.path') . '/private');
     $this->fileMigrationSetup();
   }
 
@@ -53,7 +53,7 @@ class MigratePrivateFileTest extends MigrateDrupal7TestBase {
    * Tests that all expected files are migrated.
    */
   public function testFileMigration() {
-    $this->assertEntity(3, 'Babylon5.txt', 'private://Babylon5.txt', 'text/plain', '3', '1486104045', '1486104045', '1');
+    $this->assertEntity(3, 'Babylon5.txt', 'private://Babylon5.txt', 'text/plain', 3, 1486104045, 1486104045, '1');
   }
 
 }

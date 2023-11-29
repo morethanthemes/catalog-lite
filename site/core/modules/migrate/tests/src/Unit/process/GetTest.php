@@ -18,9 +18,9 @@ class GetTest extends MigrateProcessTestCase {
     $this->row->expects($this->once())
       ->method('get')
       ->with('test')
-      ->will($this->returnValue('source_value'));
+      ->willReturn('source_value');
     $this->plugin = new Get(['source' => 'test'], '', []);
-    $value = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destinationproperty');
+    $value = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destination_property');
     $this->assertSame('source_value', $value);
   }
 
@@ -35,10 +35,10 @@ class GetTest extends MigrateProcessTestCase {
     $this->plugin = new Get(['source' => ['test1', 'test2']], '', []);
     $this->row->expects($this->exactly(2))
       ->method('get')
-      ->will($this->returnCallback(function ($argument) use ($map) {
+      ->willReturnCallback(function ($argument) use ($map) {
         return $map[$argument];
-      }));
-    $value = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destinationproperty');
+      });
+    $value = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destination_property');
     $this->assertSame(['source_value1', 'source_value2'], $value);
   }
 
@@ -49,9 +49,9 @@ class GetTest extends MigrateProcessTestCase {
     $this->row->expects($this->once())
       ->method('get')
       ->with('@@test')
-      ->will($this->returnValue('source_value'));
+      ->willReturn('source_value');
     $this->plugin = new Get(['source' => '@@test'], '', []);
-    $value = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destinationproperty');
+    $value = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destination_property');
     $this->assertSame('source_value', $value);
   }
 
@@ -68,10 +68,10 @@ class GetTest extends MigrateProcessTestCase {
     $this->plugin = new Get(['source' => ['test1', '@@test2', '@@test3', 'test4']], '', []);
     $this->row->expects($this->exactly(4))
       ->method('get')
-      ->will($this->returnCallback(function ($argument) use ($map) {
+      ->willReturnCallback(function ($argument) use ($map) {
         return $map[$argument];
-      }));
-    $value = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destinationproperty');
+      });
+    $value = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destination_property');
     $this->assertSame(['source_value1', 'source_value2', 'source_value3', 'source_value4'], $value);
   }
 
@@ -86,7 +86,7 @@ class GetTest extends MigrateProcessTestCase {
       ->willReturnOnConsecutiveCalls('val1', 'val2');
 
     $this->plugin = new Get(['source' => $source], '', []);
-    $return = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destinationproperty');
+    $return = $this->plugin->transform(NULL, $this->migrateExecutable, $this->row, 'destination_property');
     $this->assertSame($expected_value, $return);
   }
 
@@ -113,8 +113,9 @@ class GetTest extends MigrateProcessTestCase {
   }
 
   /**
-   * Tests the Get plugin for syntax errors, e.g. "Invalid tag_line detected" by
-   * creating a prophecy of the class.
+   * Tests the Get plugin for syntax errors by creating a prophecy of the class.
+   *
+   * An example of a syntax error is "Invalid tag_line detected".
    */
   public function testPluginSyntax() {
     $this->assertNotNull($this->prophesize(Get::class));

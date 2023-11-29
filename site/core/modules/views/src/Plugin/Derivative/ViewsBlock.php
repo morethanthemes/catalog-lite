@@ -41,7 +41,7 @@ class ViewsBlock implements ContainerDeriverInterface {
   public static function create(ContainerInterface $container, $base_plugin_id) {
     return new static(
       $base_plugin_id,
-      $container->get('entity.manager')->getStorage('view')
+      $container->get('entity_type.manager')->getStorage('view')
     );
   }
 
@@ -95,7 +95,7 @@ class ViewsBlock implements ContainerDeriverInterface {
             else {
               // Allow translators to control the punctuation. Plugin
               // definitions get cached, so use TranslatableMarkup() instead of
-              // t() to avoid double escaping when $admin_label is rendered
+              // $this->t() to avoid double escaping when $admin_label is rendered
               // during requests that use the cached definition.
               $admin_label = new TranslatableMarkup('@view: @display', ['@view' => $view->label(), '@display' => $display->display['display_title']]);
             }

@@ -46,6 +46,7 @@ class SessionHandler extends AbstractProxy implements \SessionHandlerInterface {
   /**
    * {@inheritdoc}
    */
+  #[\ReturnTypeWillChange]
   public function open($save_path, $name) {
     return TRUE;
   }
@@ -53,12 +54,13 @@ class SessionHandler extends AbstractProxy implements \SessionHandlerInterface {
   /**
    * {@inheritdoc}
    */
-  public function read($sid) {
+  #[\ReturnTypeWillChange]
+  public function read(#[\SensitiveParameter] $sid) {
     $data = '';
     if (!empty($sid)) {
       // Read the session data from the database.
       $query = $this->connection
-        ->queryRange('SELECT session FROM {sessions} WHERE sid = :sid', 0, 1, [':sid' => Crypt::hashBase64($sid)]);
+        ->queryRange('SELECT [session] FROM {sessions} WHERE [sid] = :sid', 0, 1, [':sid' => Crypt::hashBase64($sid)]);
       $data = (string) $query->fetchField();
     }
     return $data;
@@ -67,7 +69,8 @@ class SessionHandler extends AbstractProxy implements \SessionHandlerInterface {
   /**
    * {@inheritdoc}
    */
-  public function write($sid, $value) {
+  #[\ReturnTypeWillChange]
+  public function write(#[\SensitiveParameter] $sid, $value) {
     // The exception handler is not active at this point, so we need to do it
     // manually.
     try {
@@ -99,6 +102,7 @@ class SessionHandler extends AbstractProxy implements \SessionHandlerInterface {
   /**
    * {@inheritdoc}
    */
+  #[\ReturnTypeWillChange]
   public function close() {
     return TRUE;
   }
@@ -106,7 +110,8 @@ class SessionHandler extends AbstractProxy implements \SessionHandlerInterface {
   /**
    * {@inheritdoc}
    */
-  public function destroy($sid) {
+  #[\ReturnTypeWillChange]
+  public function destroy(#[\SensitiveParameter] $sid) {
     // Delete session data.
     $this->connection->delete('sessions')
       ->condition('sid', Crypt::hashBase64($sid))
@@ -118,12 +123,13 @@ class SessionHandler extends AbstractProxy implements \SessionHandlerInterface {
   /**
    * {@inheritdoc}
    */
+  #[\ReturnTypeWillChange]
   public function gc($lifetime) {
     // Be sure to adjust 'php_value session.gc_maxlifetime' to a large enough
     // value. For example, if you want user sessions to stay in your database
     // for three weeks before deleting them, you need to set gc_maxlifetime
     // to '1814400'. At that value, only after a user doesn't log in after
-    // three weeks (1814400 seconds) will his/her session be removed.
+    // three weeks (1814400 seconds) will their session be removed.
     $this->connection->delete('sessions')
       ->condition('timestamp', REQUEST_TIME - $lifetime, '<')
       ->execute();

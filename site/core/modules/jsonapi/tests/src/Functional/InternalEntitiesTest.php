@@ -31,6 +31,11 @@ class InternalEntitiesTest extends BrowserTestBase {
   ];
 
   /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
+
+  /**
    * A test user.
    *
    * @var \Drupal\user\UserInterface
@@ -54,7 +59,7 @@ class InternalEntitiesTest extends BrowserTestBase {
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->testUser = $this->drupalCreateUser([
       'view test entity',
@@ -78,7 +83,7 @@ class InternalEntitiesTest extends BrowserTestBase {
       'field_internal' => $this->internalEntity->id(),
     ]);
     $this->referencingEntity->save();
-    drupal_flush_all_caches();
+    \Drupal::service('router.builder')->rebuild();
   }
 
   /**

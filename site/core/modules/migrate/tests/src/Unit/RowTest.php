@@ -115,8 +115,8 @@ class RowTest extends UnitTestCase {
     $invalid_values = [
       'title' => 'node X',
     ];
-    $this->setExpectedException(\Exception::class);
-    $row = new Row($invalid_values, $this->testSourceIds);
+    $this->expectException(\Exception::class);
+    new Row($invalid_values, $this->testSourceIds);
   }
 
   /**
@@ -130,7 +130,7 @@ class RowTest extends UnitTestCase {
     $row->rehash();
     $this->assertSame($this->testHashMod, $row->getHash(), 'Hash changed correctly.');
     $row->freezeSource();
-    $this->setExpectedException(\Exception::class);
+    $this->expectException(\Exception::class);
     $row->setSourceProperty('title', 'new title');
   }
 
@@ -140,7 +140,8 @@ class RowTest extends UnitTestCase {
   public function testSetFrozenRow() {
     $row = new Row($this->testValues, $this->testSourceIds);
     $row->freezeSource();
-    $this->setExpectedException(\Exception::class, "The source is frozen and can't be changed any more");
+    $this->expectException(\Exception::class);
+    $this->expectExceptionMessage("The source is frozen and can't be changed any more");
     $row->setSourceProperty('title', 'new title');
   }
 
@@ -235,29 +236,29 @@ class RowTest extends UnitTestCase {
   public function testMultipleSourceIdValues() {
     // Set values in same order as ids.
     $multi_source_ids = $this->testSourceIds + [
-        'vid' => 'Node revision',
-        'type' => 'Node type',
-        'langcode' => 'Node language',
-      ];
+      'vid' => 'Node revision',
+      'type' => 'Node type',
+      'langcode' => 'Node language',
+    ];
     $multi_source_ids_values = $this->testValues + [
-        'vid' => 1,
-        'type' => 'page',
-        'langcode' => 'en',
-      ];
+      'vid' => 1,
+      'type' => 'page',
+      'langcode' => 'en',
+    ];
     $row = new Row($multi_source_ids_values, $multi_source_ids);
     $this->assertSame(array_keys($multi_source_ids), array_keys($row->getSourceIdValues()));
 
     // Set values in different order.
     $multi_source_ids = $this->testSourceIds + [
-        'vid' => 'Node revision',
-        'type' => 'Node type',
-        'langcode' => 'Node language',
-      ];
+      'vid' => 'Node revision',
+      'type' => 'Node type',
+      'langcode' => 'Node language',
+    ];
     $multi_source_ids_values = $this->testValues + [
-        'langcode' => 'en',
-        'type' => 'page',
-        'vid' => 1,
-      ];
+      'langcode' => 'en',
+      'type' => 'page',
+      'vid' => 1,
+    ];
     $row = new Row($multi_source_ids_values, $multi_source_ids);
     $this->assertSame(array_keys($multi_source_ids), array_keys($row->getSourceIdValues()));
   }
@@ -309,7 +310,7 @@ class RowTest extends UnitTestCase {
   }
 
   /**
-   * Test getting source and destination properties.
+   * Tests getting source and destination properties.
    *
    * @param string $key
    *   The key to look up.
@@ -353,19 +354,19 @@ class RowTest extends UnitTestCase {
   }
 
   /**
-   * Test getting multiple source and destination properties.
+   * Tests getting multiple source and destination properties.
    *
    * @param array $keys
    *   An array of keys to look up.
    * @param array $expected_values
    *   An array of expected values.
    *
-   * @covers::getMultiple
+   * @covers ::getMultiple
    * @dataProvider getMultipleDataProvider
    */
   public function testGetMultiple(array $keys, array $expected_values) {
     $row = $this->createRowWithDestinationProperties($this->testGetSourceProperties, $this->testGetSourceIds, $this->testGetDestinationProperties);
-    $this->assertArrayEquals(array_combine($keys, $expected_values), $row->getMultiple($keys));
+    $this->assertEquals(array_combine($keys, $expected_values), $row->getMultiple($keys));
   }
 
   /**
@@ -404,15 +405,15 @@ class RowTest extends UnitTestCase {
           'destination_value_3',
         ],
       ],
-      'Mix of keys including non-existant' => [
+      'Mix of keys including non-existent' => [
         'keys' => [
           'shared_key_1',
           '@shared_key_1',
           '@@shared_key_2',
           '@@@shared_key_2',
           '@@@@@@@@@shared_key_3',
-          'non_existant_source_key',
-          '@non_existant_destination_key',
+          'non_existent_source_key',
+          '@non_existent_destination_key',
         ],
         'values' => [
           'source_shared_value_1',

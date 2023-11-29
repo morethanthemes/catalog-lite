@@ -16,7 +16,7 @@ class LanguageEntityFieldAccessHookTest extends BrowserTestBase {
    *
    * @var array
    */
-  public static $modules = [
+  protected static $modules = [
     'node',
     'text',
     'field',
@@ -24,6 +24,11 @@ class LanguageEntityFieldAccessHookTest extends BrowserTestBase {
     'language',
     'language_entity_field_access_test',
   ];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * Tests compatibility with hook_entity_field_access().

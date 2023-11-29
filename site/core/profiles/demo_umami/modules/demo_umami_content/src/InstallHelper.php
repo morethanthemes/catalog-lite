@@ -8,7 +8,6 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\File\Exception\FileException;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\Core\Path\AliasManagerInterface;
 use Drupal\Core\State\StateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -19,13 +18,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *   This code is only for use by the Umami demo: Content module.
  */
 class InstallHelper implements ContainerInjectionInterface {
-
-  /**
-   * The path alias manager.
-   *
-   * @var \Drupal\Core\Path\AliasManagerInterface
-   */
-  protected $aliasManager;
 
   /**
    * Entity type manager.
@@ -76,6 +68,17 @@ class InstallHelper implements ContainerInjectionInterface {
   protected $termIdMap;
 
   /**
+   * Media Image CSV ID map.
+   *
+   * Used to store media image CSV IDs created in the import process.
+   * This allows the created media images to be cross referenced when creating
+   * article, recipes and blocks.
+   *
+   * @var array
+   */
+  protected $mediaImageIdMap;
+
+  /**
    * Node CSV ID map.
    *
    * Used to store node CSV IDs created in the import process. This allows the
@@ -86,10 +89,13 @@ class InstallHelper implements ContainerInjectionInterface {
   protected $nodeIdMap;
 
   /**
+   * The module's path.
+   */
+  protected string $module_path;
+
+  /**
    * Constructs a new InstallHelper object.
    *
-   * @param \Drupal\Core\Path\AliasManagerInterface $aliasManager
-   *   The path alias manager.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   Entity type manager.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $moduleHandler
@@ -99,13 +105,13 @@ class InstallHelper implements ContainerInjectionInterface {
    * @param \Drupal\Core\File\FileSystemInterface $fileSystem
    *   The file system.
    */
-  public function __construct(AliasManagerInterface $aliasManager, EntityTypeManagerInterface $entityTypeManager, ModuleHandlerInterface $moduleHandler, StateInterface $state, FileSystemInterface $fileSystem) {
-    $this->aliasManager = $aliasManager;
+  public function __construct(EntityTypeManagerInterface $entityTypeManager, ModuleHandlerInterface $moduleHandler, StateInterface $state, FileSystemInterface $fileSystem) {
     $this->entityTypeManager = $entityTypeManager;
     $this->moduleHandler = $moduleHandler;
     $this->state = $state;
     $this->fileSystem = $fileSystem;
     $this->termIdMap = [];
+    $this->mediaImageIdMap = [];
     $this->nodeIdMap = [];
     $this->enabledLanguages = array_keys(\Drupal::languageManager()->getLanguages());
   }
@@ -115,7 +121,6 @@ class InstallHelper implements ContainerInjectionInterface {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('path.alias_manager'),
       $container->get('entity_type.manager'),
       $container->get('module_handler'),
       $container->get('state'),
@@ -135,6 +140,7 @@ class InstallHelper implements ContainerInjectionInterface {
       ->importEditors()
       ->importContentFromFile('taxonomy_term', 'tags')
       ->importContentFromFile('taxonomy_term', 'recipe_category')
+      ->importContentFromFile('media', 'image')
       ->importContentFromFile('node', 'recipe')
       ->importContentFromFile('node', 'article')
       ->importContentFromFile('node', 'page')
@@ -184,7 +190,7 @@ class InstallHelper implements ContainerInjectionInterface {
       }
       else {
         // Language directory exists, but the file in this language was not found,
-        // remove that language from list list of languages to be translated.
+        // remove that language from list of languages to be translated.
         $key = array_search($language, $translated_languages);
         unset($translated_languages[$key]);
       }
@@ -222,6 +228,34 @@ class InstallHelper implements ContainerInjectionInterface {
    */
   protected function saveTermId($vocabulary, $term_csv_id, $tid) {
     $this->termIdMap[$vocabulary][$term_csv_id] = $tid;
+  }
+
+  /**
+   * Retrieves the Media Image ID of a media image saved during the import process.
+   *
+   * @param int $media_image_csv_id
+   *   The media image's ID from the CSV file.
+   *
+   * @return int
+   *   Media Image ID, or 0 if Media Image ID could not be found.
+   */
+  protected function getMediaImageId($media_image_csv_id) {
+    if (array_key_exists($media_image_csv_id, $this->mediaImageIdMap)) {
+      return $this->mediaImageIdMap[$media_image_csv_id];
+    }
+    return 0;
+  }
+
+  /**
+   * Saves a Media Image ID generated when saving a media image.
+   *
+   * @param int $media_image_csv_id
+   *   The media image's ID from the CSV file.
+   * @param int $media_image_id
+   *   Media Image ID generated when saved in the Drupal database.
+   */
+  protected function saveMediaImageId($media_image_csv_id, $media_image_id) {
+    $this->mediaImageIdMap[$media_image_csv_id] = $media_image_id;
   }
 
   /**
@@ -315,6 +349,35 @@ class InstallHelper implements ContainerInjectionInterface {
   }
 
   /**
+   * Process images into media entities.
+   *
+   * @param array $data
+   *   Data of line that was read from the file.
+   *
+   * @return array
+   *   Data structured as a image.
+   */
+  protected function processImage(array $data) {
+    // Set article author.
+    if (!empty($data['author'])) {
+      $values['uid'] = $this->getUser($data['author']);
+    }
+
+    $image_path = $this->module_path . '/default_content/images/' . $data['image'];
+    // Prepare content.
+    $values = [
+      'name' => $data['title'],
+      'bundle' => 'image',
+      'langcode' => 'en',
+      'field_media_image' => [
+        'target_id' => $this->createFileEntity($image_path),
+        'alt' => $data['alt'],
+      ],
+    ];
+    return $values;
+  }
+
+  /**
    * Process pages data into page node structure.
    *
    * @param array $data
@@ -357,6 +420,8 @@ class InstallHelper implements ContainerInjectionInterface {
    *
    * @param array $data
    *   Data of line that was read from the file.
+   * @param string $langcode
+   *   Current language code.
    *
    * @return array
    *   Data structured as a recipe node.
@@ -379,13 +444,10 @@ class InstallHelper implements ContainerInjectionInterface {
     }
     // Save node alias
     $this->saveNodePath($langcode, 'recipe', $data['id'], $data['slug']);
-
-    // Set field_image field.
-    if (!empty($data['image'])) {
-      $image_path = $this->module_path . '/default_content/images/' . $data['image'];
-      $values['field_image'] = [
-        'target_id' => $this->createFileEntity($image_path),
-        'alt' => $data['alt'],
+    // Set field_media_image field.
+    if (!empty($data['image_reference'])) {
+      $values['field_media_image'] = [
+        'target_id' => $this->getMediaImageId($data['image_reference']),
       ];
     }
     // Set field_summary field.
@@ -486,12 +548,10 @@ class InstallHelper implements ContainerInjectionInterface {
     if (!empty($data['author'])) {
       $values['uid'] = $this->getUser($data['author']);
     }
-    // Set Image field.
-    if (!empty($data['image'])) {
-      $path = $this->module_path . '/default_content/images/' . $data['image'];
-      $values['field_image'] = [
-        'target_id' => $this->createFileEntity($path),
-        'alt' => $data['alt'],
+    // Set field_media_image field.
+    if (!empty($data['image_reference'])) {
+      $values['field_media_image'] = [
+        'target_id' => $this->getMediaImageId($data['image_reference']),
       ];
     }
     // Set field_tags if exists.
@@ -535,9 +595,8 @@ class InstallHelper implements ContainerInjectionInterface {
       'field_summary' => [
         'value' => $data['field_summary'],
       ],
-      'field_banner_image' => [
-        'target_id' => $this->createFileEntity($this->module_path . '/default_content/images/' . $data['field_banner_image_target_id']),
-        'alt' => $data['field_banner_image_alt'],
+      'field_media_image' => [
+        'target_id' => $this->getMediaImageId($data['image_reference']),
       ],
     ];
     return $values;
@@ -598,9 +657,8 @@ class InstallHelper implements ContainerInjectionInterface {
       'field_summary' => [
         'value' => $data['field_summary'],
       ],
-      'field_promo_image' => [
-        'target_id' => $this->createFileEntity($this->module_path . '/default_content/images/' . $data['field_promo_image_target_id']),
-        'alt' => $data['field_promo_image_alt'],
+      'field_media_image' => [
+        'target_id' => $this->getMediaImageId($data['image_reference']),
       ],
     ];
     return $values;
@@ -624,25 +682,36 @@ class InstallHelper implements ContainerInjectionInterface {
       case 'recipe':
         $structured_content = $this->processRecipe($content, $langcode);
         break;
+
       case 'article':
         $structured_content = $this->processArticle($content, $langcode);
         break;
+
       case 'page':
         $structured_content = $this->processPage($content, $langcode);
         break;
+
       case 'banner_block':
         $structured_content = $this->processBannerBlock($content, $langcode);
         break;
+
       case 'disclaimer_block':
         $structured_content = $this->processDisclaimerBlock($content);
         break;
+
       case 'footer_promo_block':
         $structured_content = $this->processFooterPromoBlock($content, $langcode);
         break;
+
+      case 'image':
+        $structured_content = $this->processImage($content);
+        break;
+
       case 'recipe_category':
       case 'tags':
         $structured_content = $this->processTerm($content, $bundle_machine_name);
         break;
+
       default:
         break;
     }
@@ -663,7 +732,7 @@ class InstallHelper implements ContainerInjectionInterface {
     $filename = $entity_type . '/' . $bundle_machine_name . '.csv';
 
     // Read all multilingual content from the file.
-    list($all_content, $translated_languages) = $this->readMultilingualContent($filename);
+    [$all_content, $translated_languages] = $this->readMultilingualContent($filename);
 
     // English is no longer needed in the list of languages to translate.
     $key = array_search('en', $translated_languages);
@@ -679,9 +748,14 @@ class InstallHelper implements ContainerInjectionInterface {
       $entity->save();
       $this->storeCreatedContentUuids([$entity->uuid() => $entity_type]);
 
-      // Taxonomy entities - save ID internally to reference nodes later.
+      // Save taxonomy entity Drupal ID, so we can reference it in nodes.
       if ($entity_type == 'taxonomy_term') {
         $this->saveTermId($bundle_machine_name, $current_content['id'], $entity->id());
+      }
+
+      // Save media entity Drupal ID, so we can reference it in nodes & blocks.
+      if ($entity_type == 'media') {
+        $this->saveMediaImageId($current_content['id'], $entity->id());
       }
 
       // Go through all the languages that have translations.

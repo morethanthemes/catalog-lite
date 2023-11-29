@@ -2,7 +2,6 @@
 
 namespace Drupal\views\Plugin\views\row;
 
-use Drupal\Core\DependencyInjection\DeprecatedServicePropertyTrait;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -23,12 +22,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 class EntityRow extends RowPluginBase {
   use EntityTranslationRenderTrait;
-  use DeprecatedServicePropertyTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $deprecatedProperties = ['entityManager' => 'entity.manager'];
 
   /**
    * The table the entity is using for storage.
@@ -36,13 +29,6 @@ class EntityRow extends RowPluginBase {
    * @var string
    */
   public $base_table;
-
-  /**
-   * The actual field which is used for the entity id.
-   *
-   * @var string
-   */
-  public $base_field;
 
   /**
    * Stores the entity type ID of the result entities.
@@ -96,7 +82,7 @@ class EntityRow extends RowPluginBase {
    * @param array $plugin_definition
    *   The plugin implementation definition.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
-   *   The entity manager.
+   *   The entity type manager.
    * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
    *   The language manager.
    * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
@@ -109,17 +95,7 @@ class EntityRow extends RowPluginBase {
 
     $this->entityTypeManager = $entity_type_manager;
     $this->languageManager = $language_manager;
-
-    if (!$entity_repository) {
-      @trigger_error('Calling EntityRow::__construct() with the $entity_repository argument is supported in drupal:8.7.0 and will be required before drupal:9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_repository = \Drupal::service('entity.repository');
-    }
     $this->entityRepository = $entity_repository;
-
-    if (!$entity_display_repository) {
-      @trigger_error('Calling EntityRow::__construct() with the $entity_display_repository argument is supported in drupal:8.7.0 and will be required before drupal:9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_display_repository = \Drupal::service('entity_display.repository');
-    }
     $this->entityDisplayRepository = $entity_display_repository;
   }
 
@@ -155,15 +131,6 @@ class EntityRow extends RowPluginBase {
    */
   public function getEntityTypeId() {
     return $this->entityType->id();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function getEntityManager() {
-    // This relies on DeprecatedServicePropertyTrait to trigger a deprecation
-    // message in case it is accessed.
-    return $this->entityManager;
   }
 
   /**
@@ -235,7 +202,11 @@ class EntityRow extends RowPluginBase {
    */
   public function query() {
     parent::query();
-    $this->getEntityTranslationRenderer()->query($this->view->getQuery());
+    $relationship_table = NULL;
+    if (isset($this->options['relationship'], $this->view->relationship[$this->options['relationship']])) {
+      $relationship_table = $this->view->relationship[$this->options['relationship']]->alias;
+    }
+    $this->getEntityTranslationRenderer()->query($this->view->getQuery(), $relationship_table);
   }
 
   /**
@@ -244,7 +215,7 @@ class EntityRow extends RowPluginBase {
   public function preRender($result) {
     parent::preRender($result);
     if ($result) {
-      $this->getEntityTranslationRenderer()->preRender($result);
+      $this->getEntityTranslationRenderer()->preRenderByRelationship($result, isset($this->options['relationship']) ? $this->options['relationship'] : 'none');
     }
   }
 
@@ -252,7 +223,7 @@ class EntityRow extends RowPluginBase {
    * {@inheritdoc}
    */
   public function render($row) {
-    return $this->getEntityTranslationRenderer()->render($row);
+    return $this->getEntityTranslationRenderer()->renderByRelationship($row, isset($this->options['relationship']) ? $this->options['relationship'] : 'none');
   }
 
   /**

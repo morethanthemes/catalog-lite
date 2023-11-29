@@ -54,8 +54,8 @@ trait QueryTrait {
 
     // Only alter the query if the active workspace is not the default one and
     // the entity type is supported.
-    $active_workspace = $this->workspaceManager->getActiveWorkspace();
-    if (!$active_workspace->isDefaultWorkspace() && $this->workspaceManager->isEntityTypeSupported($this->entityType)) {
+    if ($this->workspaceManager->hasActiveWorkspace() && $this->workspaceManager->isEntityTypeSupported($this->entityType)) {
+      $active_workspace = $this->workspaceManager->getActiveWorkspace();
       $this->sqlQuery->addMetaData('active_workspace_id', $active_workspace->id());
       $this->sqlQuery->addMetaData('simple_query', FALSE);
 
@@ -63,7 +63,7 @@ trait QueryTrait {
       // can properly include live content along with a possible workspace
       // revision.
       $id_field = $this->entityType->getKey('id');
-      $this->sqlQuery->leftJoin('workspace_association', 'workspace_association', "%alias.target_entity_type_id = '{$this->entityTypeId}' AND %alias.target_entity_id = base_table.$id_field AND %alias.workspace = '{$active_workspace->id()}'");
+      $this->sqlQuery->leftJoin('workspace_association', 'workspace_association', "[%alias].[target_entity_type_id] = '{$this->entityTypeId}' AND [%alias].[target_entity_id] = [base_table].[$id_field] AND [%alias].[workspace] = '{$active_workspace->id()}'");
     }
 
     return $this;

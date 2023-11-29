@@ -11,12 +11,12 @@ use Drupal\node\Entity\NodeType;
  *
  * @group jsonapi
  */
-class EntityFormDisplayTest extends ResourceTestBase {
+class EntityFormDisplayTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['node'];
+  protected static $modules = ['node', 'field_ui'];
 
   /**
    * {@inheritdoc}
@@ -34,6 +34,11 @@ class EntityFormDisplayTest extends ResourceTestBase {
    * @var \Drupal\Core\Entity\Display\EntityFormDisplayInterface
    */
   protected $entity;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -139,6 +144,7 @@ class EntityFormDisplayTest extends ResourceTestBase {
               'weight' => 5,
               'settings' => [
                 'match_operator' => 'CONTAINS',
+                'match_limit' => 10,
                 'size' => 60,
                 'placeholder' => '',
               ],
@@ -167,6 +173,7 @@ class EntityFormDisplayTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
   /**

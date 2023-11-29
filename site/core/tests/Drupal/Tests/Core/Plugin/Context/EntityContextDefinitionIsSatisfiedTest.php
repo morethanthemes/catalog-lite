@@ -7,7 +7,6 @@ use Drupal\Core\DependencyInjection\ClassResolverInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\ContentEntityStorageInterface;
-use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityType;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
@@ -22,6 +21,7 @@ use Drupal\Core\TypedData\TypedDataManager;
 use Drupal\Core\Validation\ConstraintManager;
 use Drupal\Tests\UnitTestCase;
 use Prophecy\Argument;
+use Prophecy\Prophet;
 
 /**
  * @coversDefaultClass \Drupal\Core\Plugin\Context\EntityContextDefinition
@@ -37,13 +37,6 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
   protected $entityTypeManager;
 
   /**
-   * The entity manager.
-   *
-   * @var \Drupal\Core\Entity\EntityManagerInterface
-   */
-  protected $entityManager;
-
-  /**
    * The entity type bundle info.
    *
    * @var \Drupal\Core\Entity\EntityTypeBundleInfoInterface
@@ -53,7 +46,7 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $namespaces = new \ArrayObject([
@@ -74,8 +67,6 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
     $type_data_manager->setValidationConstraintManager(new ConstraintManager($namespaces, $cache_backend, $module_handler->reveal()));
 
     $this->entityTypeManager = $this->prophesize(EntityTypeManagerInterface::class);
-    $this->entityManager = $this->prophesize(EntityManagerInterface::class);
-
     $this->entityTypeBundleInfo = $this->prophesize(EntityTypeBundleInfoInterface::class);
 
     $string_translation = new TranslationManager(new LanguageDefault([]));
@@ -83,7 +74,6 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
     $container = new ContainerBuilder();
     $container->set('typed_data_manager', $type_data_manager);
     $container->set('entity_type.manager', $this->entityTypeManager->reveal());
-    $container->set('entity.manager', $this->entityManager->reveal());
     $container->set('entity_type.bundle.info', $this->entityTypeBundleInfo->reveal());
     $container->set('string_translation', $string_translation);
     \Drupal::setContainer($container);
@@ -94,14 +84,16 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
    *
    * @param bool $expected
    *   The expected outcome.
-   * @param \Drupal\Core\Plugin\Context\EntityContextDefinition $requirement
+   * @param \Drupal\Core\Plugin\Context\ContextDefinition $requirement
    *   The requirement to check against.
-   * @param \Drupal\Core\Plugin\Context\EntityContextDefinition $definition
+   * @param \Drupal\Core\Plugin\Context\ContextDefinition $definition
    *   The context definition to check.
    * @param mixed $value
    *   (optional) The value to set on the context, defaults to NULL.
+   *
+   * @internal
    */
-  protected function assertRequirementIsSatisfied($expected, ContextDefinition $requirement, ContextDefinition $definition, $value = NULL) {
+  protected function assertRequirementIsSatisfied(bool $expected, ContextDefinition $requirement, ContextDefinition $definition, $value = NULL): void {
     $context = new EntityContext($definition, $value);
     $this->assertSame($expected, $requirement->isSatisfiedBy($context));
   }
@@ -124,7 +116,7 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
     $content_entity_type = new EntityType(['id' => 'test_content']);
     $this->entityTypeManager->getDefinition('test_config')->willReturn($config_entity_type);
     $this->entityTypeManager->getDefinition('test_content')->willReturn($content_entity_type);
-    $this->entityManager->getDefinitions()->willReturn([
+    $this->entityTypeManager->getDefinitions()->willReturn([
       'test_config' => $config_entity_type,
       'test_content' => $content_entity_type,
     ]);
@@ -142,7 +134,7 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
   /**
    * Provides test data for ::testIsSatisfiedBy().
    */
-  public function providerTestIsSatisfiedBy() {
+  public static function providerTestIsSatisfiedBy() {
     $data = [];
 
     $content = new EntityType(['id' => 'test_content']);
@@ -154,7 +146,7 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
       EntityContextDefinition::fromEntityType($content),
       EntityContextDefinition::fromEntityType($content),
     ];
-    $entity = $this->prophesize(ContentEntityInterface::class)->willImplement(\IteratorAggregate::class);
+    $entity = (new Prophet())->prophesize(ContentEntityInterface::class)->willImplement(\IteratorAggregate::class);
     $entity->getIterator()->willReturn(new \ArrayIterator([]));
     $entity->getCacheContexts()->willReturn([]);
     $entity->getCacheTags()->willReturn([]);
@@ -229,7 +221,7 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
     $this->entityTypeManager->getStorage('test_content')->willReturn($content_entity_storage->reveal());
 
     $this->entityTypeManager->getDefinition('test_content')->willReturn($entity_type);
-    $this->entityManager->getDefinitions()->willReturn([
+    $this->entityTypeManager->getDefinitions()->willReturn([
       'test_content' => $entity_type,
     ]);
 
@@ -297,7 +289,7 @@ class EntityContextDefinitionIsSatisfiedTest extends UnitTestCase {
    */
   public function testIsSatisfiedByPassBundledEntity($expected, $requirement_constraint) {
     $entity_type = new EntityType(['id' => 'test_content']);
-    $this->entityManager->getDefinitions()->willReturn([
+    $this->entityTypeManager->getDefinitions()->willReturn([
       'test_content' => $entity_type,
     ]);
     $this->entityTypeManager->getDefinition('test_content')->willReturn($entity_type);

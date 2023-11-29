@@ -2,16 +2,15 @@
 
 namespace Drupal\Component\Plugin;
 
+@trigger_error('The ' . __NAMESPACE__ . '\PluginHelper is deprecated in drupal:10.1.0 and is removed from drupal:11.0.0. Instead, use instanceof() to check for \Drupal\Component\Plugin\ConfigurableInterface. See http://drupal.org/node/3198285', E_USER_DEPRECATED);
+
 /**
  * A helper class to determine if a plugin is configurable.
  *
- * Because configurable plugins in Drupal 8 might implement either the
- * deprecated ConfigurablePluginInterface or the new ConfigurableInterface,
- * this static method is provided so that a calling class can determine if a
- * plugin is configurable without checking it against a deprecated interface.
- * In Drupal 9, this check should be reduced to checking for
- * ConfigurableInterface only and be deprecated in favor of calling classes
- * checking against the interface directly.
+ * @deprecated in drupal:10.1.0 and is removed from drupal:11.0.0. Instead, use
+ *   instanceof() to check for \Drupal\Component\Plugin\ConfigurableInterface.
+ *
+ * @see https://www.drupal.org/node/3198285
  */
 class PluginHelper {
 
@@ -25,7 +24,7 @@ class PluginHelper {
    *   A boolean indicating whether the plugin is configurable.
    */
   public static function isConfigurable($plugin) {
-    return $plugin instanceof ConfigurableInterface || $plugin instanceof ConfigurablePluginInterface;
+    return $plugin instanceof ConfigurableInterface;
   }
 
 }

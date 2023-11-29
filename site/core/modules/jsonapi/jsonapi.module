@@ -176,16 +176,6 @@ function jsonapi_jsonapi_entity_filter_access(EntityTypeInterface $entity_type, 
 }
 
 /**
- * Implements hook_jsonapi_ENTITY_TYPE_filter_access() for 'aggregator_feed'.
- */
-function jsonapi_jsonapi_aggregator_feed_filter_access(EntityTypeInterface $entity_type, AccountInterface $account) {
-  // @see \Drupal\aggregator\FeedAccessControlHandler::checkAccess()
-  return ([
-    JSONAPI_FILTER_AMONG_ALL => AccessResult::allowedIfHasPermission($account, 'access news feeds'),
-  ]);
-}
-
-/**
  * Implements hook_jsonapi_ENTITY_TYPE_filter_access() for 'block_content'.
  */
 function jsonapi_jsonapi_block_content_filter_access(EntityTypeInterface $entity_type, AccountInterface $account) {
@@ -193,6 +183,7 @@ function jsonapi_jsonapi_block_content_filter_access(EntityTypeInterface $entity
   // \Drupal\jsonapi\Access\TemporaryQueryGuard adds the condition for
   // (isReusable()), so this does not have to.
   return ([
+    JSONAPI_FILTER_AMONG_ALL => AccessResult::allowedIfHasPermission($account, 'access block library'),
     JSONAPI_FILTER_AMONG_PUBLISHED => AccessResult::allowed(),
   ]);
 }
@@ -321,8 +312,6 @@ function jsonapi_jsonapi_user_filter_access(EntityTypeInterface $entity_type, Ac
  */
 function jsonapi_jsonapi_workspace_filter_access(EntityTypeInterface $entity_type, $published, $owner, AccountInterface $account) {
   // @see \Drupal\workspaces\WorkspaceAccessControlHandler::checkAccess()
-  // \Drupal\jsonapi\Access\TemporaryQueryGuard adds the condition for
-  // (isDefaultWorkspace()), so this does not have to.
   return ([
     JSONAPI_FILTER_AMONG_ALL => AccessResult::allowedIfHasPermission($account, 'view any workspace'),
     JSONAPI_FILTER_AMONG_OWN => AccessResult::allowedIfHasPermission($account, 'view own workspace'),

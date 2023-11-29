@@ -20,8 +20,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  * is invalid.
  *
  * @see \Drupal\KernelTests\KernelTestBase::register()
- * @see \Drupal\simpletest\WebTestBase::setUp()
- * @see \Drupal\simpletest\KernelTestBase::containerBuild()
+ * @see \Drupal\Core\Test\FunctionalTestSetupTrait::prepareSettings()
  */
 class ConfigSchemaChecker implements EventSubscriberInterface {
   use SchemaCheckTrait;
@@ -100,7 +99,7 @@ class ConfigSchemaChecker implements EventSubscriberInterface {
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
     $events[ConfigEvents::SAVE][] = ['onConfigSave', 255];
     return $events;
   }

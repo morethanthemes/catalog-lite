@@ -10,7 +10,7 @@ use Drupal\views\ViewExecutable;
 use Drupal\Core\Form\OptGroup;
 
 /**
- * Simple filter to handle matching of multiple options selectable via checkboxes
+ * Simple filter to handle matching of multiple options selectable via checkboxes.
  *
  * Definition items:
  * - options callback: The function to call in order to generate the value options. If omitted, the options 'Yes' and 'No' will be used.
@@ -48,6 +48,8 @@ class InOperator extends FilterPluginBase {
   }
 
   /**
+   * Gets the value options.
+   *
    * Child classes should be used to override this function and set the
    * 'value options', unless 'options callback' is defined as a valid function
    * or static public method to generate these values.
@@ -72,7 +74,7 @@ class InOperator extends FilterPluginBase {
       }
     }
     else {
-      $this->valueOptions = [t('Yes'), $this->t('No')];
+      $this->valueOptions = [$this->t('Yes'), $this->t('No')];
     }
 
     return $this->valueOptions;
@@ -105,6 +107,8 @@ class InOperator extends FilterPluginBase {
   }
 
   /**
+   * Gets the operators.
+   *
    * This kind of construct makes it relatively easy for a child class
    * to add or remove functionality by overriding this function and
    * adding/removing items from this array.
@@ -148,7 +152,7 @@ class InOperator extends FilterPluginBase {
   }
 
   /**
-   * Build strings from the operators() for 'select' options
+   * Build strings from the operators() for 'select' options.
    */
   public function operatorOptions($which = 'title') {
     $options = [];
@@ -452,7 +456,7 @@ class InOperator extends FilterPluginBase {
       }
     }
     elseif (!empty($this->value) && ($this->operator == 'in' || $this->operator == 'not in')) {
-      $errors[] = $this->t('The value @value is not an array for @operator on filter: @filter', ['@value' => var_export($this->value), '@operator' => $this->operator, '@filter' => $this->adminLabel(TRUE)]);
+      $errors[] = $this->t('The value @value is not an array for @operator on filter: @filter', ['@value' => var_export($this->value, TRUE), '@operator' => $this->operator, '@filter' => $this->adminLabel(TRUE)]);
     }
     return $errors;
   }

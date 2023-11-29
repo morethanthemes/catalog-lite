@@ -101,7 +101,7 @@ class UserAccessControlHandler extends EntityAccessControlHandler {
       case 'name':
         // Allow view access to anyone with access to the entity.
         // The username field is editable during the registration process.
-        if ($operation == 'view' || ($items && $items->getEntity()->isAnonymous())) {
+        if ($operation == 'view' || ($items && $items->getEntity()->isNew())) {
           return AccessResult::allowed()->cachePerPermissions();
         }
         // Allow edit access for the own user name if the permission is
@@ -113,10 +113,15 @@ class UserAccessControlHandler extends EntityAccessControlHandler {
           return AccessResult::neutral();
         }
 
+      case 'mail':
+        // Only check for the 'view user email addresses' permission and a view
+        // operation. Use case fall-through for all other cases.
+        if ($operation == 'view' && $account->hasPermission('view user email addresses')) {
+          return AccessResult::allowed()->cachePerPermissions();
+        }
       case 'preferred_langcode':
       case 'preferred_admin_langcode':
       case 'timezone':
-      case 'mail':
         // Allow view access to own mail address and other personalization
         // settings.
         if ($operation == 'view') {

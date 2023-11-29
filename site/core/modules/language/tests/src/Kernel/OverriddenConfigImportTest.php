@@ -28,7 +28,7 @@ class OverriddenConfigImportTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->installConfig(['system']);
@@ -48,7 +48,9 @@ class OverriddenConfigImportTest extends KernelTestBase {
       $this->container->get('module_handler'),
       $this->container->get('module_installer'),
       $this->container->get('theme_handler'),
-      $this->container->get('string_translation')
+      $this->container->get('string_translation'),
+      $this->container->get('extension.list.module'),
+      $this->container->get('extension.list.theme')
     );
   }
 
@@ -68,7 +70,7 @@ class OverriddenConfigImportTest extends KernelTestBase {
 
     // Also make a change to the same config object, but using a language
     // override.
-    /* @var \Drupal\Core\Config\StorageInterface $overridden_sync */
+    /** @var \Drupal\Core\Config\StorageInterface $overridden_sync */
     $overridden_sync = $sync->createCollection('language.fr');
     $overridden_sync->write('system.site', ['name' => 'French site name']);
 

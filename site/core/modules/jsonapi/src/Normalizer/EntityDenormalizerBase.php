@@ -15,7 +15,7 @@ use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
  * @internal JSON:API maintains no PHP API since its API is the HTTP API. This
  *   class may change at any time and this will break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  */
 abstract class EntityDenormalizerBase extends NormalizerBase implements DenormalizerInterface {
@@ -67,25 +67,25 @@ abstract class EntityDenormalizerBase extends NormalizerBase implements Denormal
   /**
    * {@inheritdoc}
    */
-  public function supportsNormalization($data, $format = NULL) {
+  public function supportsNormalization($data, string $format = NULL, array $context = []): bool {
     return FALSE;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function normalize($object, $format = NULL, array $context = []) {
+  public function normalize($object, $format = NULL, array $context = []): array|string|int|float|bool|\ArrayObject|NULL {
     throw new \LogicException('This method should never be called.');
   }
 
   /**
    * {@inheritdoc}
    */
-  public function denormalize($data, $class, $format = NULL, array $context = []) {
+  public function denormalize($data, $class, $format = NULL, array $context = []): mixed {
     if (empty($context['resource_type']) || !$context['resource_type'] instanceof ResourceType) {
       throw new PreconditionFailedHttpException('Missing context during denormalization.');
     }
-    /* @var \Drupal\jsonapi\ResourceType\ResourceType $resource_type */
+    /** @var \Drupal\jsonapi\ResourceType\ResourceType $resource_type */
     $resource_type = $context['resource_type'];
     $entity_type_id = $resource_type->getEntityTypeId();
     $bundle = $resource_type->getBundle();

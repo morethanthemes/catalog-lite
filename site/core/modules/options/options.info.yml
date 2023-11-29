@@ -1,14 +1,13 @@
 name: Options
 type: module
-description: 'Defines selection, check box and radio button widgets for text and numeric fields.'
+description: 'Defines field types with select lists, checkboxes, and radio buttons to select values from fixed lists of options.'
 package: Field types
 # version: VERSION
-core: 8.x
 dependencies:
   - drupal:field
   - drupal:text
 
-# Information added by Drupal.org packaging script on 2019-10-02
-version: '8.7.8'
+# Information added by Drupal.org packaging script on 2023-11-01
+version: '10.1.6'
 project: 'drupal'
-datestamp: 1570044520
+datestamp: 1698841355

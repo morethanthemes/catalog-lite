@@ -10,7 +10,7 @@ use Drupal\Component\Assertion\Inspector;
  * @internal JSON:API maintains no PHP API. The API is the HTTP API. This class
  *   may change at any time and could break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  */
 final class LinkCollection implements \IteratorAggregate {
@@ -28,7 +28,7 @@ final class LinkCollection implements \IteratorAggregate {
    * All links objects exist within a context object. Links form a relationship
    * between a source IRI and target IRI. A context is the link's source.
    *
-   * @var \Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel|\Drupal\jsonapi\JsonApiResource\ResourceObject
+   * @var \Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel|\Drupal\jsonapi\JsonApiResource\ResourceObject|\Drupal\jsonapi\JsonApiResource\Relationship
    *
    * @see https://tools.ietf.org/html/rfc8288#section-3.2
    */
@@ -39,7 +39,7 @@ final class LinkCollection implements \IteratorAggregate {
    *
    * @param \Drupal\jsonapi\JsonApiResource\Link[] $links
    *   An associated array of key names and JSON:API Link objects.
-   * @param \Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel|\Drupal\jsonapi\JsonApiResource\ResourceObject $context
+   * @param \Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel|\Drupal\jsonapi\JsonApiResource\ResourceObject|\Drupal\jsonapi\JsonApiResource\Relationship $context
    *   (internal use only) The context object. Use the self::withContext()
    *   method to establish a context. This should be done automatically when
    *   a LinkCollection is passed into a context object.
@@ -51,7 +51,7 @@ final class LinkCollection implements \IteratorAggregate {
     assert(Inspector::assertAll(function ($link) {
       return $link instanceof Link || is_array($link) && Inspector::assertAllObjects($link, Link::class);
     }, $links));
-    assert(is_null($context) || Inspector::assertAllObjects([$context], JsonApiDocumentTopLevel::class, ResourceObject::class));
+    assert(is_null($context) || Inspector::assertAllObjects([$context], JsonApiDocumentTopLevel::class, ResourceObject::class, Relationship::class));
     ksort($links);
     $this->links = array_map(function ($link) {
       return is_array($link) ? $link : [$link];
@@ -62,6 +62,7 @@ final class LinkCollection implements \IteratorAggregate {
   /**
    * {@inheritdoc}
    */
+  #[\ReturnTypeWillChange]
   public function getIterator() {
     assert(!is_null($this->context), 'A LinkCollection is invalid unless a context has been established.');
     return new \ArrayIterator($this->links);
@@ -71,8 +72,9 @@ final class LinkCollection implements \IteratorAggregate {
    * Gets a new LinkCollection with the given link inserted.
    *
    * @param string $key
-   *   A key for the link. If the key already exists and the link shares an href
-   *   with an existing link with that key, those links will be merged together.
+   *   A key for the link. If the key already exists and the link shares an
+   *   href, link relation type and attributes with an existing link with that
+   *   key, those links will be merged together.
    * @param \Drupal\jsonapi\JsonApiResource\Link $new_link
    *   The link to insert.
    *
@@ -111,7 +113,7 @@ final class LinkCollection implements \IteratorAggregate {
   /**
    * Establishes a new context for a LinkCollection.
    *
-   * @param \Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel|\Drupal\jsonapi\JsonApiResource\ResourceObject $context
+   * @param \Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel|\Drupal\jsonapi\JsonApiResource\ResourceObject|\Drupal\jsonapi\JsonApiResource\Relationship $context
    *   The new context object.
    *
    * @return static
@@ -124,7 +126,7 @@ final class LinkCollection implements \IteratorAggregate {
   /**
    * Gets the LinkCollection's context object.
    *
-   * @return \Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel|\Drupal\jsonapi\JsonApiResource\ResourceObject
+   * @return \Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel|\Drupal\jsonapi\JsonApiResource\ResourceObject|\Drupal\jsonapi\JsonApiResource\Relationship
    *   The LinkCollection's context.
    */
   public function getContext() {
@@ -193,7 +195,7 @@ final class LinkCollection implements \IteratorAggregate {
    *   TRUE if the key is valid, FALSE otherwise.
    */
   protected static function validKey($key) {
-    return is_string($key) && !is_numeric($key) && strpos($key, ':') === FALSE;
+    return is_string($key) && !is_numeric($key) && !str_contains($key, ':');
   }
 
 }

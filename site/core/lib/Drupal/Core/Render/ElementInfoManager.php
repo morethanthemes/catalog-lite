@@ -45,7 +45,7 @@ class ElementInfoManager extends DefaultPluginManager implements ElementInfoMana
   protected $cacheTagInvalidator;
 
   /**
-   * Constructs a ElementInfoManager object.
+   * Constructs an ElementInfoManager object.
    *
    * @param \Traversable $namespaces
    *   An object that implements \Traversable which contains the root paths
@@ -65,6 +65,7 @@ class ElementInfoManager extends DefaultPluginManager implements ElementInfoMana
     $this->cacheTagInvalidator = $cache_tag_invalidator;
 
     parent::__construct('Element', $namespaces, $module_handler, 'Drupal\Core\Render\Element\ElementInterface', 'Drupal\Core\Render\Annotation\RenderElement');
+    $this->alterInfo('element_plugin');
   }
 
   /**
@@ -75,7 +76,7 @@ class ElementInfoManager extends DefaultPluginManager implements ElementInfoMana
     if (!isset($this->elementInfo[$theme_name])) {
       $this->elementInfo[$theme_name] = $this->buildInfo($theme_name);
     }
-    $info = isset($this->elementInfo[$theme_name][$type]) ? $this->elementInfo[$theme_name][$type] : [];
+    $info = $this->elementInfo[$theme_name][$type] ?? [];
     $info['#defaults_loaded'] = TRUE;
     return $info;
   }
@@ -86,7 +87,7 @@ class ElementInfoManager extends DefaultPluginManager implements ElementInfoMana
   public function getInfoProperty($type, $property_name, $default = NULL) {
     $info = $this->getInfo($type);
 
-    return isset($info[$property_name]) ? $info[$property_name] : $default;
+    return $info[$property_name] ?? $default;
   }
 
   /**
@@ -106,6 +107,16 @@ class ElementInfoManager extends DefaultPluginManager implements ElementInfoMana
 
     // Otherwise, rebuild and cache.
     $info = [];
+    $previous_error_handler = set_error_handler(function ($severity, $message, $file, $line) use (&$previous_error_handler) {
+      // Ignore deprecations while building element information.
+      if ($severity === E_USER_DEPRECATED) {
+        // Don't execute PHP internal error handler.
+        return TRUE;
+      }
+      if ($previous_error_handler) {
+        return $previous_error_handler($severity, $message, $file, $line);
+      }
+    });
     foreach ($this->getDefinitions() as $element_type => $definition) {
       $element = $this->createInstance($element_type);
       $element_info = $element->getInfo();
@@ -118,6 +129,7 @@ class ElementInfoManager extends DefaultPluginManager implements ElementInfoMana
       }
       $info[$element_type] = $element_info;
     }
+    restore_error_handler();
 
     foreach ($info as $element_type => $element) {
       $info[$element_type]['#type'] = $element_type;

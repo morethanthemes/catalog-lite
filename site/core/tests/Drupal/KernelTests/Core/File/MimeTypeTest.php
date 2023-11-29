@@ -14,10 +14,10 @@ class MimeTypeTest extends FileTestBase {
    *
    * @var array
    */
-  public static $modules = ['file_test'];
+  protected static $modules = ['file_test'];
 
   /**
-   * Test mapping of mimetypes from filenames.
+   * Tests mapping of mimetypes from filenames.
    */
   public function testFileMimeTypeDetection() {
     $prefixes = ['public://', 'private://', 'temporary://', 'dummy-remote://'];
@@ -44,13 +44,13 @@ class MimeTypeTest extends FileTestBase {
     foreach ($test_case as $input => $expected) {
       // Test stream [URI].
       foreach ($prefixes as $prefix) {
-        $output = $guesser->guess($prefix . $input);
-        $this->assertIdentical($output, $expected, format_string('Mimetype for %input is %output (expected: %expected).', ['%input' => $prefix . $input, '%output' => $output, '%expected' => $expected]));
+        $output = $guesser->guessMimeType($prefix . $input);
+        $this->assertSame($expected, $output);
       }
 
       // Test normal path equivalent
-      $output = $guesser->guess($input);
-      $this->assertIdentical($output, $expected, format_string('Mimetype (using default mappings) for %input is %output (expected: %expected).', ['%input' => $input, '%output' => $output, '%expected' => $expected]));
+      $output = $guesser->guessMimeType($input);
+      $this->assertSame($expected, $output);
     }
 
     // Now test the extension guesser by passing in a custom mapping.
@@ -60,8 +60,8 @@ class MimeTypeTest extends FileTestBase {
         1 => 'image/jpeg',
       ],
       'extensions' => [
-         'jar' => 0,
-         'jpg' => 1,
+        'jar' => 0,
+        'jpg' => 1,
       ],
     ];
 
@@ -84,8 +84,8 @@ class MimeTypeTest extends FileTestBase {
     $extension_guesser->setMapping($mapping);
 
     foreach ($test_case as $input => $expected) {
-      $output = $extension_guesser->guess($input);
-      $this->assertIdentical($output, $expected, format_string('Mimetype (using passed-in mappings) for %input is %output (expected: %expected).', ['%input' => $input, '%output' => $output, '%expected' => $expected]));
+      $output = $extension_guesser->guessMimeType($input);
+      $this->assertSame($expected, $output);
     }
   }
 

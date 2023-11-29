@@ -3,13 +3,11 @@
 namespace Drupal\Tests\jsonapi\Functional;
 
 use Drupal\Tests\views\Functional\ViewTestBase;
-use Drupal\views\Tests\ViewTestData;
 
 /**
  * Ensures that the 'api_json' format is not supported by the REST module.
  *
  * @group jsonapi
- * @group legacy
  *
  * @internal
  */
@@ -23,14 +21,18 @@ class RestExportJsonApiUnsupported extends ViewTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['jsonapi', 'rest_test_views', 'views_ui'];
+  protected static $modules = ['jsonapi', 'rest_test_views', 'views_ui'];
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp($import_test_views = TRUE) {
-    parent::setUp($import_test_views);
-    ViewTestData::createTestViews(get_class($this), ['rest_test_views']);
+  protected $defaultTheme = 'stark';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp($import_test_views = TRUE, $modules = ['rest_test_views']): void {
+    parent::setUp($import_test_views, $modules);
 
     $this->drupalLogin($this->drupalCreateUser(['administer views']));
   }

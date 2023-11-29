@@ -16,7 +16,7 @@ class DateFormatterTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['language', 'system'];
+  protected static $modules = ['language', 'system'];
 
   /**
    * Arbitrary langcode for a custom language.
@@ -26,7 +26,7 @@ class DateFormatterTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->installConfig(['system']);
@@ -36,7 +36,7 @@ class DateFormatterTest extends KernelTestBase {
       'Long month name' => ['March' => 'marzo'],
     ]);
 
-    $formats = $this->container->get('entity.manager')
+    $formats = $this->container->get('entity_type.manager')
       ->getStorage('date_format')
       ->loadMultiple(['long', 'medium', 'short']);
     $formats['long']->setPattern('l, j. F Y - G:i')->save();
@@ -108,6 +108,28 @@ class DateFormatterTest extends KernelTestBase {
     // HTML is not escaped by the date formatter, it must be escaped later.
     $this->assertSame("<script>alert('2007');</script>", $formatter->format($timestamp, 'custom', '\<\s\c\r\i\p\t\>\a\l\e\r\t\(\'Y\'\)\;\<\/\s\c\r\i\p\t\>'), 'Script tags not removed from dates.');
     $this->assertSame('<em>2007</em>', $formatter->format($timestamp, 'custom', '\<\e\m\>Y\<\/\e\m\>'), 'Em tags are not removed from dates.');
+  }
+
+  /**
+   * Tests that an RFC2822 formatted date always returns an English string.
+   *
+   * @see http://www.faqs.org/rfcs/rfc2822.html
+   *
+   * @covers ::format
+   */
+  public function testRfc2822DateFormat() {
+    $days_of_week_abbr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    foreach ($days_of_week_abbr as $day_of_week_abbr) {
+      $this->setSetting('locale_custom_strings_' . self::LANGCODE, [
+        'Abbreviated weekday' => [$day_of_week_abbr => $this->randomString(3)],
+      ]);
+    }
+    /** @var \Drupal\Core\Datetime\DateFormatterInterface $formatter */
+    $formatter = $this->container->get('date.formatter');
+
+    // Check that RFC2822 format date is returned regardless of langcode.
+    $this->assertEquals('Sat, 02 Feb 2019 13:30:00 +0100', $formatter->format(1549110600, 'custom', 'r', 'Europe/Berlin', static::LANGCODE));
+    $this->assertEquals('Sat, 02 Feb 2019 13:30:00 +0100', $formatter->format(1549110600, 'custom', 'r', 'Europe/Berlin'));
   }
 
 }

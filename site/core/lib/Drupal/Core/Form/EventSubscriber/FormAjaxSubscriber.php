@@ -13,8 +13,8 @@ use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\HttpKernel\Event\GetResponseForControllerResultEvent;
-use Symfony\Component\HttpKernel\Event\GetResponseForExceptionEvent;
+use Symfony\Component\HttpKernel\Event\ViewEvent;
+use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
@@ -57,10 +57,10 @@ class FormAjaxSubscriber implements EventSubscriberInterface {
   /**
    * Alters the wrapper format if this is an AJAX form request.
    *
-   * @param \Symfony\Component\HttpKernel\Event\GetResponseForControllerResultEvent $event
+   * @param \Symfony\Component\HttpKernel\Event\ViewEvent $event
    *   The event to process.
    */
-  public function onView(GetResponseForControllerResultEvent $event) {
+  public function onView(ViewEvent $event) {
     // To support an AJAX form submission of a form within a block, make the
     // later VIEW subscribers process the controller result as though for
     // HTML display (i.e., add blocks). During that block building, when the
@@ -76,11 +76,11 @@ class FormAjaxSubscriber implements EventSubscriberInterface {
   /**
    * Catches a form AJAX exception and build a response from it.
    *
-   * @param \Symfony\Component\HttpKernel\Event\GetResponseForExceptionEvent $event
+   * @param \Symfony\Component\HttpKernel\Event\ExceptionEvent $event
    *   The event to process.
    */
-  public function onException(GetResponseForExceptionEvent $event) {
-    $exception = $event->getException();
+  public function onException(ExceptionEvent $event) {
+    $exception = $event->getThrowable();
     $request = $event->getRequest();
 
     // Render a nice error message in case we have a file upload which exceeds
@@ -116,7 +116,7 @@ class FormAjaxSubscriber implements EventSubscriberInterface {
       }
       catch (\Exception $e) {
         // Otherwise, replace the existing exception with the new one.
-        $event->setException($e);
+        $event->setThrowable($e);
       }
     }
   }
@@ -124,13 +124,13 @@ class FormAjaxSubscriber implements EventSubscriberInterface {
   /**
    * Extracts a form AJAX exception.
    *
-   * @param \Exception $e
+   * @param \Throwable $e
    *   A generic exception that might contain a form AJAX exception.
    *
    * @return \Drupal\Core\Form\FormAjaxException|null
    *   Either the form AJAX exception, or NULL if none could be found.
    */
-  protected function getFormAjaxException(\Exception $e) {
+  protected function getFormAjaxException(\Throwable $e) {
     $exception = NULL;
     while ($e) {
       if ($e instanceof FormAjaxException) {
@@ -156,7 +156,7 @@ class FormAjaxSubscriber implements EventSubscriberInterface {
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
     // Run before exception.logger.
     $events[KernelEvents::EXCEPTION] = ['onException', 51];
     // Run before main_content_view_subscriber.

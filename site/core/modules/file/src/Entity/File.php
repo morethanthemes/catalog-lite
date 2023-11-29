@@ -2,6 +2,7 @@
 
 namespace Drupal\file\Entity;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityChangedTrait;
 use Drupal\Core\Entity\EntityStorageInterface;
@@ -31,6 +32,13 @@ use Drupal\user\EntityOwnerTrait;
  *     "storage_schema" = "Drupal\file\FileStorageSchema",
  *     "access" = "Drupal\file\FileAccessControlHandler",
  *     "views_data" = "Drupal\file\FileViewsData",
+ *     "list_builder" = "Drupal\Core\Entity\EntityListBuilder",
+ *     "form" = {
+ *       "delete" = "Drupal\Core\Entity\ContentEntityDeleteForm",
+ *     },
+ *     "route_provider" = {
+ *       "html" = "Drupal\file\Entity\FileRouteProvider",
+ *     },
  *   },
  *   base_table = "file_managed",
  *   entity_keys = {
@@ -39,6 +47,9 @@ use Drupal\user\EntityOwnerTrait;
  *     "langcode" = "langcode",
  *     "uuid" = "uuid",
  *     "owner" = "uid",
+ *   },
+ *   links = {
+ *     "delete-form" = "/file/{file}/delete",
  *   }
  * )
  */
@@ -79,21 +90,9 @@ class File extends ContentEntityBase implements FileInterface {
    * {@inheritdoc}
    */
   public function createFileUrl($relative = TRUE) {
-    $url = file_create_url($this->getFileUri());
-    if ($relative && $url) {
-      $url = file_url_transform_relative($url);
-    }
-    return $url;
-  }
-
-  /**
-   * {@inheritdoc}
-   *
-   * @see file_url_transform_relative()
-   */
-  public function url($rel = 'canonical', $options = []) {
-    @trigger_error('File entities returning the URL to the physical file in File::url() is deprecated, use $file->createFileUrl() instead. See https://www.drupal.org/node/3019830', E_USER_DEPRECATED);
-    return $this->createFileUrl(FALSE);
+    /** @var \Drupal\Core\File\FileUrlGeneratorInterface $file_url_generator */
+    $file_url_generator = \Drupal::service('file_url_generator');
+    return $relative ? $file_url_generator->generateString($this->getFileUri()) : $file_url_generator->generateAbsoluteString($this->getFileUri());
   }
 
   /**
@@ -114,7 +113,8 @@ class File extends ContentEntityBase implements FileInterface {
    * {@inheritdoc}
    */
   public function getSize() {
-    return $this->get('filesize')->value;
+    $filesize = $this->get('filesize')->value;
+    return isset($filesize) ? (int) $filesize : NULL;
   }
 
   /**
@@ -128,14 +128,15 @@ class File extends ContentEntityBase implements FileInterface {
    * {@inheritdoc}
    */
   public function getCreatedTime() {
-    return $this->get('created')->value;
+    $created = $this->get('created')->value;
+    return isset($created) ? (int) $created : NULL;
   }
 
   /**
    * {@inheritdoc}
    */
   public function isPermanent() {
-    return $this->get('status')->value == FILE_STATUS_PERMANENT;
+    return $this->get('status')->value == static::STATUS_PERMANENT;
   }
 
   /**
@@ -149,7 +150,7 @@ class File extends ContentEntityBase implements FileInterface {
    * {@inheritdoc}
    */
   public function setPermanent() {
-    $this->get('status')->value = FILE_STATUS_PERMANENT;
+    $this->get('status')->value = static::STATUS_PERMANENT;
   }
 
   /**
@@ -170,7 +171,7 @@ class File extends ContentEntityBase implements FileInterface {
 
     // Automatically detect filemime if not set.
     if (!isset($values['filemime']) && isset($values['uri'])) {
-      $values['filemime'] = \Drupal::service('file.mime_type.guesser')->guess($values['uri']);
+      $values['filemime'] = \Drupal::service('file.mime_type.guesser')->guessMimeType($values['uri']);
     }
   }
 
@@ -278,6 +279,22 @@ class File extends ContentEntityBase implements FileInterface {
    */
   public static function getDefaultEntityOwner() {
     return NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function invalidateTagsOnSave($update) {
+    $tags = $this->getListCacheTagsToInvalidate();
+    // Always invalidate the 404 or 403 response cache because while files do
+    // not have a canonical URL as such, they may be served via routes such as
+    // private files.
+    // Creating or updating an entity may change a cached 403 or 404 response.
+    $tags = Cache::mergeTags($tags, ['4xx-response']);
+    if ($update) {
+      $tags = Cache::mergeTags($tags, $this->getCacheTagsToInvalidate());
+    }
+    Cache::invalidateTags($tags);
   }
 
 }

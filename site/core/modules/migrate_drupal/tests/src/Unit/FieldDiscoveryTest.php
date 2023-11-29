@@ -42,7 +42,7 @@ class FieldDiscoveryTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->fieldPluginManager = $this->prophesize(MigrateFieldPluginManagerInterface::class);
     $this->migrationPluginManager = $this->prophesize(MigrationPluginManagerInterface::class);
@@ -178,7 +178,7 @@ class FieldDiscoveryTest extends UnitTestCase {
         'entity_type_id' => 'user',
         'bundle' => 'user',
         'expected_fields' => [
-            'user_field_1' => ['field_info_key' => 'user_field_1_data'],
+          'user_field_1' => ['field_info_key' => 'user_field_1_data'],
         ],
       ],
       'Comment - Content Type 1' => [
@@ -213,7 +213,7 @@ class FieldDiscoveryTest extends UnitTestCase {
   }
 
   /**
-   * Test the protected getCoreVersion method.
+   * Tests the protected getCoreVersion method.
    *
    * @param string[] $tags
    *   The migration tags.
@@ -228,7 +228,7 @@ class FieldDiscoveryTest extends UnitTestCase {
     $migration->getMigrationTags()->willReturn($tags);
     $field_discovery = new FieldDiscoveryTestClass($this->fieldPluginManager->reveal(), $this->migrationPluginManager->reveal(), $this->logger->reveal());
     if (!$expected_result) {
-      $this->setExpectedException(\InvalidArgumentException::class);
+      $this->expectException(\InvalidArgumentException::class);
     }
     $actual_result = $field_discovery->getCoreVersion($migration->reveal());
     $this->assertEquals($expected_result, $actual_result);
@@ -316,7 +316,8 @@ class FieldDiscoveryTest extends UnitTestCase {
   public function testGetFieldInstanceStubMigrationDefinition($core, $expected_definition) {
     $field_discovery = new FieldDiscoveryTestClass($this->fieldPluginManager->reveal(), $this->migrationPluginManager->reveal(), $this->logger->reveal());
     if (!$expected_definition) {
-      $this->setExpectedException(\InvalidArgumentException::class, sprintf("Drupal version %s is not supported. Valid values for Drupal core version are '6' and '7'.", $core));
+      $this->expectException(\InvalidArgumentException::class);
+      $this->expectExceptionMessage(sprintf("Drupal version %s is not supported. Valid values for Drupal core version are '6' and '7'.", $core));
     }
     $actual_definition = $field_discovery->getFieldInstanceStubMigrationDefinition($core);
     $this->assertSame($expected_definition, $actual_definition);

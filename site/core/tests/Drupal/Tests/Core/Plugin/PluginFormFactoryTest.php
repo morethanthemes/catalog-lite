@@ -34,7 +34,7 @@ class PluginFormFactoryTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->classResolver = $this->prophesize(ClassResolverInterface::class);
@@ -125,21 +125,23 @@ class PluginFormFactoryTest extends UnitTestCase {
    * @covers ::createInstance
    */
   public function testCreateInstanceDefinitionException() {
-    $this->setExpectedException(InvalidPluginDefinitionException::class, 'The "the_plugin_id" plugin did not specify a "anything" form class');
+    $this->expectException(InvalidPluginDefinitionException::class);
+    $this->expectExceptionMessage('The "the_plugin_id" plugin did not specify a "anything" form class');
 
     $plugin = $this->prophesize(PluginWithFormsInterface::class);
     $plugin->getPluginId()->willReturn('the_plugin_id');
     $plugin->hasFormClass('anything')->willReturn(FALSE);
 
     $form_object = $this->manager->createInstance($plugin->reveal(), 'anything');
-    $this->assertSame(NULL, $form_object);
+    $this->assertNull($form_object);
   }
 
   /**
    * @covers ::createInstance
    */
   public function testCreateInstanceInvalidException() {
-    $this->setExpectedException(InvalidPluginDefinitionException::class, 'The "the_plugin_id" plugin did not specify a valid "invalid" form class, must implement \Drupal\Core\Plugin\PluginFormInterface');
+    $this->expectException(InvalidPluginDefinitionException::class);
+    $this->expectExceptionMessage('The "the_plugin_id" plugin did not specify a valid "invalid" form class, must implement \Drupal\Core\Plugin\PluginFormInterface');
 
     $expected = new \stdClass();
     $this->classResolver->getInstanceFromDefinition(get_class($expected))->willReturn($expected);
@@ -150,7 +152,7 @@ class PluginFormFactoryTest extends UnitTestCase {
     $plugin->getFormClass('invalid')->willReturn(get_class($expected));
 
     $form_object = $this->manager->createInstance($plugin->reveal(), 'invalid');
-    $this->assertSame(NULL, $form_object);
+    $this->assertNull($form_object);
   }
 
 }

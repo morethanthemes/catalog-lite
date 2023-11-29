@@ -17,6 +17,7 @@ use Drupal\Core\Url;
 use Drupal\Core\Utility\LinkGeneratorInterface;
 use Drupal\menu_link_content\MenuLinkContentStorageInterface;
 use Drupal\menu_link_content\Plugin\Menu\MenuLinkContent;
+use Drupal\system\MenuStorage;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -112,7 +113,7 @@ class MenuForm extends EntityForm {
       '#type' => 'machine_name',
       '#title' => $this->t('Menu name'),
       '#default_value' => $menu->id(),
-      '#maxlength' => MENU_MAX_MENU_NAME_LENGTH_UI,
+      '#maxlength' => MenuStorage::MAX_ID_LENGTH,
       '#description' => $this->t('A unique name to construct the URL for the menu. It must only contain lowercase letters, numbers and hyphens.'),
       '#machine_name' => [
         'exists' => [$this, 'menuNameExists'],
@@ -125,14 +126,14 @@ class MenuForm extends EntityForm {
     ];
     $form['description'] = [
       '#type' => 'textfield',
-      '#title' => t('Administrative summary'),
+      '#title' => $this->t('Administrative summary'),
       '#maxlength' => 512,
       '#default_value' => $menu->getDescription(),
     ];
 
     $form['langcode'] = [
       '#type' => 'language_select',
-      '#title' => t('Menu language'),
+      '#title' => $this->t('Menu language'),
       '#languages' => LanguageInterface::STATE_ALL,
       '#default_value' => $menu->language()->getId(),
     ];
@@ -270,7 +271,7 @@ class MenuForm extends EntityForm {
           'subgroup' => 'menu-parent',
           'source' => 'menu-id',
           'hidden' => TRUE,
-          'limit' => \Drupal::menuTree()->maxDepth() - 1,
+          'limit' => $this->menuTree->maxDepth() - 1,
         ],
         [
           'action' => 'order',
@@ -281,9 +282,9 @@ class MenuForm extends EntityForm {
     ];
 
     $form['links']['#empty'] = $this->t('There are no menu links yet. <a href=":url">Add link</a>.', [
-      ':url' => $this->url('entity.menu.add_link_form', ['menu' => $this->entity->id()], [
+      ':url' => Url::fromRoute('entity.menu.add_link_form', ['menu' => $this->entity->id()], [
         'query' => ['destination' => $this->entity->toUrl('edit-form')->toString()],
-      ]),
+      ])->toString(),
     ]);
     $links = $this->buildOverviewTreeForm($tree, $delta);
 
@@ -432,41 +433,12 @@ class MenuForm extends EntityForm {
           '#type' => 'hidden',
           '#default_value' => $link->getParent(),
         ];
-        // Build a list of operations.
-        $operations = [];
-        $operations['edit'] = [
-          'title' => $this->t('Edit'),
-        ];
-        // Allow for a custom edit link per plugin.
-        $edit_route = $link->getEditRoute();
-        if ($edit_route) {
-          $operations['edit']['url'] = $edit_route;
-          // Bring the user back to the menu overview.
-          $operations['edit']['query'] = $this->getDestinationArray();
-        }
-        else {
-          // Fall back to the standard edit link.
-          $operations['edit'] += [
-            'url' => Url::fromRoute('menu_ui.link_edit', ['menu_link_plugin' => $link->getPluginId()]),
-          ];
-        }
-        // Links can either be reset or deleted, not both.
-        if ($link->isResettable()) {
-          $operations['reset'] = [
-            'title' => $this->t('Reset'),
-            'url' => Url::fromRoute('menu_ui.link_reset', ['menu_link_plugin' => $link->getPluginId()]),
-          ];
-        }
-        elseif ($delete_link = $link->getDeleteRoute()) {
-          $operations['delete']['url'] = $delete_link;
-          $operations['delete']['query'] = $this->getDestinationArray();
-          $operations['delete']['title'] = $this->t('Delete');
-        }
-        if ($link->isTranslatable()) {
-          $operations['translate'] = [
-            'title' => $this->t('Translate'),
-            'url' => $link->getTranslateRoute(),
-          ];
+        $operations = $link->getOperations();
+        foreach ($operations as $key => $operation) {
+          if (!isset($operations[$key]['query'])) {
+            // Bring the user back to the menu overview.
+            $operations[$key]['query'] = $this->getDestinationArray();
+          }
         }
         $form[$id]['operations'] = [
           '#type' => 'operations',
@@ -526,7 +498,7 @@ class MenuForm extends EntityForm {
         if ($updated_values) {
           // Use the ID from the actual plugin instance since the hidden value
           // in the form could be tampered with.
-          $this->menuLinkManager->updateDefinition($element['#item']->link->getPLuginId(), $updated_values);
+          $this->menuLinkManager->updateDefinition($element['#item']->link->getPluginId(), $updated_values);
         }
       }
     }

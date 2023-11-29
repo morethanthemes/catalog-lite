@@ -14,19 +14,12 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * @internal JSON:API maintains no PHP API since its API is the HTTP API. This
  *   class may change at any time and this will break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  *
  * @see http://jsonapi.org/format/#error-objects
  */
 class HttpExceptionNormalizer extends NormalizerBase {
-
-  /**
-   * The interface or class that this Normalizer supports.
-   *
-   * @var string
-   */
-  protected $supportedInterfaceOrClass = HttpException::class;
 
   /**
    * The current user making the request.
@@ -48,8 +41,16 @@ class HttpExceptionNormalizer extends NormalizerBase {
   /**
    * {@inheritdoc}
    */
-  public function normalize($object, $format = NULL, array $context = []) {
-    return new HttpExceptionNormalizerValue(new CacheableMetadata(), static::rasterizeValueRecursive($this->buildErrorObjects($object)));
+  public function normalize($object, $format = NULL, array $context = []): array|string|int|float|bool|\ArrayObject|NULL {
+    $cacheability = new CacheableMetadata();
+    $cacheability->addCacheableDependency($object);
+
+    $cacheability->addCacheTags(['config:system.logging']);
+    if (\Drupal::config('system.logging')->get('error_level') === ERROR_REPORTING_DISPLAY_VERBOSE) {
+      $cacheability->setCacheMaxAge(0);
+    }
+
+    return new HttpExceptionNormalizerValue($cacheability, static::rasterizeValueRecursive($this->buildErrorObjects($object)));
   }
 
   /**
@@ -85,9 +86,12 @@ class HttpExceptionNormalizer extends NormalizerBase {
     // Exceptions thrown without an explicitly defined code get assigned zero by
     // default. Since this is no helpful information, omit it.
     if ($exception->getCode() !== 0) {
-      $error['code'] = $exception->getCode();
+      $error['code'] = (string) $exception->getCode();
     }
-    if ($this->currentUser->hasPermission('access site reports')) {
+
+    $is_verbose_reporting = \Drupal::config('system.logging')->get('error_level') === ERROR_REPORTING_DISPLAY_VERBOSE;
+    $site_report_access = $this->currentUser->hasPermission('access site reports');
+    if ($site_report_access && $is_verbose_reporting) {
       // The following information may contain sensitive information. Only show
       // it to authorized users.
       $error['source'] = [
@@ -110,7 +114,7 @@ class HttpExceptionNormalizer extends NormalizerBase {
    *   URL pointing to the specific RFC-2616 section. Or NULL if it is an HTTP
    *   status code that is defined in another RFC.
    *
-   * @see https://www.drupal.org/project/jsonapi/issues/2832211#comment-11826234
+   * @see https://www.drupal.org/project/drupal/issues/2832211#comment-11826234
    *
    * @internal
    */
@@ -160,6 +164,24 @@ class HttpExceptionNormalizer extends NormalizerBase {
       '505' => '#sec10.5.6',
     ];
     return empty($sections[$status_code]) ? NULL : $url . $sections[$status_code];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasCacheableSupportsMethod(): bool {
+    @trigger_error(__METHOD__ . '() is deprecated in drupal:10.1.0 and is removed from drupal:11.0.0. Use getSupportedTypes() instead. See https://www.drupal.org/node/3359695', E_USER_DEPRECATED);
+
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSupportedTypes(?string $format): array {
+    return [
+      HttpException::class => TRUE,
+    ];
   }
 
 }

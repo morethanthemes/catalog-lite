@@ -10,13 +10,17 @@ use Drupal\user\Entity\Role;
  *
  * @group jsonapi
  */
-class RoleTest extends ResourceTestBase {
-
+class RoleTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['user'];
+  protected static $modules = ['user'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -48,7 +52,7 @@ class RoleTest extends ResourceTestBase {
   protected function createEntity() {
     $role = Role::create([
       'id' => 'llama',
-      'name' => $this->randomString(),
+      'label' => 'Llama',
     ]);
     $role->save();
 
@@ -83,7 +87,7 @@ class RoleTest extends ResourceTestBase {
           'langcode' => 'en',
           'status' => TRUE,
           'dependencies' => [],
-          'label' => NULL,
+          'label' => 'Llama',
           'is_admin' => NULL,
           'permissions' => [],
           'drupal_internal__id' => 'llama',
@@ -97,6 +101,7 @@ class RoleTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
 }

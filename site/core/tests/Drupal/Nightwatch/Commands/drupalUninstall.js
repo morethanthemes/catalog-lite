@@ -1,5 +1,5 @@
-import { execSync } from 'child_process';
-import { commandAsWebserver } from '../globals';
+const { execSync } = require('child_process');
+const { commandAsWebserver } = require('../globals');
 
 /**
  * Uninstalls a test Drupal site.
@@ -9,7 +9,7 @@ import { commandAsWebserver } from '../globals';
  * @return {object}
  *   The 'browser' object.
  */
-exports.command = function drupalUninstal(callback) {
+exports.command = function drupalUninstall(callback) {
   const self = this;
   const prefix = this.globals.drupalDbPrefix;
 

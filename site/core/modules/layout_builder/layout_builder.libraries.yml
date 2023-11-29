@@ -3,10 +3,11 @@ drupal.layout_builder:
   css:
     theme:
       css/layout-builder.css: {}
+      css/off-canvas.css: {}
   js:
     js/layout-builder.js: {}
   dependencies:
-    - core/jquery.ui.sortable
+    - core/sortable
     - core/drupal.dialog.off_canvas
     - core/drupal.announce
     - core/drupal.debounce

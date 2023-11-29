@@ -3,7 +3,6 @@
 namespace Drupal\Core\Annotation;
 
 use Drupal\Component\Annotation\Plugin;
-use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
  * @defgroup plugin_context Annotation for context definition
@@ -106,7 +105,7 @@ class ContextDefinition extends Plugin {
     // used in the classes they pass to.
     foreach (['label', 'description'] as $key) {
       // @todo Remove this workaround in https://www.drupal.org/node/2362727.
-      if (isset($values[$key]) && $values[$key] instanceof TranslatableMarkup) {
+      if (isset($values[$key]) && $values[$key] instanceof Translation) {
         $values[$key] = (string) $values[$key]->get();
       }
       else {
@@ -146,7 +145,7 @@ class ContextDefinition extends Plugin {
     if (isset($values['class'])) {
       return $values['class'];
     }
-    if (strpos($values['value'], 'entity:') === 0) {
+    if (str_starts_with($values['value'], 'entity:')) {
       return 'Drupal\Core\Plugin\Context\EntityContextDefinition';
     }
     return 'Drupal\Core\Plugin\Context\ContextDefinition';

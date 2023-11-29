@@ -12,6 +12,7 @@ use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -51,7 +52,7 @@ class CommentController extends ControllerBase {
   /**
    * The entity repository.
    *
-   * @var Drupal\Core\Entity\EntityRepositoryInterface
+   * @var \Drupal\Core\Entity\EntityRepositoryInterface
    */
   protected $entityRepository;
 
@@ -69,19 +70,11 @@ class CommentController extends ControllerBase {
    * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
    *   The entity repository service.
    */
-  public function __construct(HttpKernelInterface $http_kernel, CommentManagerInterface $comment_manager, EntityTypeManagerInterface $entity_type_manager, EntityFieldManagerInterface $entity_field_manager = NULL, EntityRepositoryInterface $entity_repository = NULL) {
+  public function __construct(HttpKernelInterface $http_kernel, CommentManagerInterface $comment_manager, EntityTypeManagerInterface $entity_type_manager, EntityFieldManagerInterface $entity_field_manager, EntityRepositoryInterface $entity_repository) {
     $this->httpKernel = $http_kernel;
     $this->commentManager = $comment_manager;
     $this->entityTypeManager = $entity_type_manager;
-    if (!$entity_field_manager) {
-      @trigger_error('The entity_field.manager service must be passed to CommentController::__construct(), it is required before Drupal 9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_field_manager = \Drupal::service('entity_field.manager');
-    }
     $this->entityFieldManager = $entity_field_manager;
-    if (!$entity_repository) {
-      @trigger_error('The entity.repository service must be passed to CommentController::__construct(), it is required before Drupal 9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_repository = \Drupal::service('entity.repository');
-    }
     $this->entityRepository = $entity_repository;
   }
 
@@ -190,7 +183,7 @@ class CommentController extends ControllerBase {
    *   The node object identified by the legacy URL.
    *
    * @return \Symfony\Component\HttpFoundation\RedirectResponse
-   *   Redirects user to new url.
+   *   Redirects user to new URL.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\NotFoundHttpException
    */
@@ -249,7 +242,7 @@ class CommentController extends ControllerBase {
         $build['comment_parent'] = $this->entityTypeManager()->getViewBuilder('comment')->view($comment);
       }
 
-      // The comment is in response to a entity.
+      // The comment is in response to an entity.
       elseif ($entity->access('view', $account)) {
         // We make sure the field value isn't set so we don't end up with a
         // redirect loop.
@@ -344,11 +337,12 @@ class CommentController extends ControllerBase {
       throw new AccessDeniedHttpException();
     }
 
-    $nids = $request->request->get('node_ids');
-    $field_name = $request->request->get('field_name');
-    if (!isset($nids)) {
+    if (!$request->request->has('node_ids') || !$request->request->has('field_name')) {
       throw new NotFoundHttpException();
     }
+    $nids = $request->request->all('node_ids');
+    $field_name = $request->request->get('field_name');
+
     // Only handle up to 100 nodes.
     $nids = array_slice($nids, 0, 100);
 
@@ -361,7 +355,7 @@ class CommentController extends ControllerBase {
       $query = $page_number ? ['page' => $page_number] : NULL;
       $links[$nid] = [
         'new_comment_count' => (int) $new,
-        'first_new_comment_link' => $this->getUrlGenerator()->generateFromRoute('entity.node.canonical', ['node' => $node->id()], ['query' => $query, 'fragment' => 'new']),
+        'first_new_comment_link' => Url::fromRoute('entity.node.canonical', ['node' => $node->id()], ['query' => $query, 'fragment' => 'new'])->toString(),
       ];
     }
 

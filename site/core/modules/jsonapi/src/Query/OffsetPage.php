@@ -11,7 +11,7 @@ use Drupal\Core\Http\Exception\CacheableBadRequestHttpException;
  * @internal JSON:API maintains no PHP API since its API is the HTTP API. This
  *   class may change at any time and this will break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  */
 class OffsetPage {
@@ -104,7 +104,7 @@ class OffsetPage {
    * @param mixed $parameter
    *   The `page` query parameter from the Symfony request object.
    *
-   * @return \Drupal\jsonapi\Query\OffsetPage
+   * @return static
    *   An OffsetPage object with defaults.
    */
   public static function createFromQueryParameter($parameter) {

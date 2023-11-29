@@ -20,7 +20,7 @@ class HandlerArgumentUserUidTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = [
+  protected static $modules = [
     'system',
     'user',
     'user_test_views',
@@ -35,7 +35,7 @@ class HandlerArgumentUserUidTest extends KernelTestBase {
   public static $testViews = ['test_user_uid_argument'];
 
   /**
-   * Tests the generated title of an user: uid argument.
+   * Tests the generated title of a user: uid argument.
    */
   public function testArgumentTitle() {
     $this->installSchema('system', ['sequences']);
@@ -48,7 +48,7 @@ class HandlerArgumentUserUidTest extends KernelTestBase {
 
     // Tests an invalid user uid.
     $view->preview(NULL, [rand(1000, 10000)]);
-    $this->assertFalse($view->getTitle());
+    $this->assertEmpty($view->getTitle());
     $view->destroy();
 
     // Tests a valid user.

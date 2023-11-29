@@ -17,17 +17,13 @@ trait SchemaCheckTrait {
 
   /**
    * The config schema wrapper object for the configuration object under test.
-   *
-   * @var \Drupal\Core\Config\Schema\Element
    */
-  protected $schema;
+  protected TraversableTypedDataInterface $schema;
 
   /**
    * The configuration object name under test.
-   *
-   * @var string
    */
-  protected $configName;
+  protected string $configName;
 
   /**
    * Checks the TypedConfigManager has a valid schema for the configuration.
@@ -58,8 +54,9 @@ trait SchemaCheckTrait {
     $this->schema = $typed_config->createFromNameAndData($config_name, $config_data);
     $errors = [];
     foreach ($config_data as $key => $value) {
-      $errors = array_merge($errors, $this->checkValue($key, $value));
+      $errors[] = $this->checkValue($key, $value);
     }
+    $errors = array_merge(...$errors);
     if (empty($errors)) {
       return TRUE;
     }
@@ -79,7 +76,15 @@ trait SchemaCheckTrait {
    */
   protected function checkValue($key, $value) {
     $error_key = $this->configName . ':' . $key;
+    /** @var \Drupal\Core\TypedData\TypedDataInterface $element */
     $element = $this->schema->get($key);
+
+    // Check if this type has been deprecated.
+    $data_definition = $element->getDataDefinition();
+    if (!empty($data_definition['deprecated'])) {
+      @trigger_error($data_definition['deprecated'], E_USER_DEPRECATED);
+    }
+
     if ($element instanceof Undefined) {
       return [$error_key => 'missing schema'];
     }
@@ -122,11 +127,12 @@ trait SchemaCheckTrait {
       if (!is_array($value)) {
         $value = (array) $value;
       }
+      $nested_errors = [];
       // Recurse into any nested keys.
       foreach ($value as $nested_value_key => $nested_value) {
-        $errors = array_merge($errors, $this->checkValue($key . '.' . $nested_value_key, $nested_value));
+        $nested_errors[] = $this->checkValue($key . '.' . $nested_value_key, $nested_value);
       }
-      return $errors;
+      return array_merge($errors, ...$nested_errors);
     }
     // No errors found.
     return [];

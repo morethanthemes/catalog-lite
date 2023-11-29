@@ -2,7 +2,7 @@ name: Catalog Lite
 type: theme
 base theme: classy
 description: 'A flexible, recolorable theme with many regions and a responsive, mobile-first layout.'
-core: 8.x
+core_version_requirement: ^8 || ^9 || ^10
 libraries:
   - catalog_lite/global-styling
   - catalog_lite/messages
@@ -56,7 +56,7 @@ regions:
   footer: 'Subfooter Second'
   hidden_blocks_collection: 'Hidden blocks collection'
 
-# Information added by Drupal.org packaging script on 2019-10-16
-version: '8.x-1.0'
+# Information added by Drupal.org packaging script on 2023-11-11
+version: '8.x-1.4'
 project: 'catalog_lite'
-datestamp: 1571215087
+datestamp: 1699694028

@@ -2,6 +2,7 @@
 
 namespace Drupal\media_library\Plugin\Field\FieldWidget;
 
+use Drupal\Component\Render\FormattableMarkup;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\SortArray;
 use Drupal\Core\Ajax\AjaxResponse;
@@ -16,13 +17,14 @@ use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\WidgetBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Security\TrustedCallbackInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
 use Drupal\field_ui\FieldUI;
 use Drupal\media\Entity\Media;
-use Drupal\media_library\MediaLibraryUiBuilder;
 use Drupal\media_library\MediaLibraryState;
+use Drupal\media_library\MediaLibraryUiBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
@@ -40,11 +42,9 @@ use Symfony\Component\Validator\ConstraintViolationInterface;
  * )
  *
  * @internal
- *   Media Library is an experimental module and its internal code may be
- *   subject to change in minor releases. External code should not instantiate
- *   or extend this class.
+ *   Plugin classes are internal.
  */
-class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInterface {
+class MediaLibraryWidget extends WidgetBase implements TrustedCallbackInterface {
 
   /**
    * Entity type manager service.
@@ -87,18 +87,10 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
    */
-  public function __construct($plugin_id, $plugin_definition, FieldDefinitionInterface $field_definition, array $settings, array $third_party_settings, EntityTypeManagerInterface $entity_type_manager, AccountInterface $current_user = NULL, ModuleHandlerInterface $module_handler = NULL) {
+  public function __construct($plugin_id, $plugin_definition, FieldDefinitionInterface $field_definition, array $settings, array $third_party_settings, EntityTypeManagerInterface $entity_type_manager, AccountInterface $current_user, ModuleHandlerInterface $module_handler) {
     parent::__construct($plugin_id, $plugin_definition, $field_definition, $settings, $third_party_settings);
     $this->entityTypeManager = $entity_type_manager;
-    if (!$current_user) {
-      @trigger_error('The current_user service must be passed to MediaLibraryWidget::__construct(), it is required before Drupal 9.0.0.', E_USER_DEPRECATED);
-      $current_user = \Drupal::currentUser();
-    }
     $this->currentUser = $current_user;
-    if (!$module_handler) {
-      @trigger_error('The module_handler service must be passed to MediaLibraryWidget::__construct(), it is required before Drupal 9.0.0.', E_USER_DEPRECATED);
-      $module_handler = \Drupal::moduleHandler();
-    }
     $this->moduleHandler = $module_handler;
   }
 
@@ -148,7 +140,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     $handler_settings = $this->getFieldSetting('handler_settings');
     // The target bundles will be blank when saving field storage settings,
     // when first adding a media reference field.
-    $allowed_media_type_ids = isset($handler_settings['target_bundles']) ? $handler_settings['target_bundles'] : NULL;
+    $allowed_media_type_ids = $handler_settings['target_bundles'] ?? NULL;
 
     // When there are no allowed media types, return the empty array.
     if ($allowed_media_type_ids === []) {
@@ -184,13 +176,14 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
    * {@inheritdoc}
    */
   public function settingsForm(array $form, FormStateInterface $form_state) {
+    $elements = [];
     $media_type_ids = $this->getAllowedMediaTypeIdsSorted();
 
     if (count($media_type_ids) <= 1) {
-      return $form;
+      return $elements;
     }
 
-    $form['media_types'] = [
+    $elements['media_types'] = [
       '#type' => 'table',
       '#header' => [
         $this->t('Tab order'),
@@ -210,11 +203,11 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     $weight = 0;
     foreach ($media_types as $media_type_id => $media_type) {
       $label = $media_type->label();
-      $form['media_types'][$media_type_id] = [
+      $elements['media_types'][$media_type_id] = [
         'label' => ['#markup' => $label],
         'weight' => [
           '#type' => 'weight',
-          '#title' => t('Weight for @title', ['@title' => $label]),
+          '#title' => $this->t('Weight for @title', ['@title' => $label]),
           '#title_display' => 'invisible',
           '#default_value' => $weight,
           '#attributes' => ['class' => ['weight']],
@@ -225,7 +218,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
       $weight++;
     }
 
-    return $form;
+    return $elements;
   }
 
   /**
@@ -247,7 +240,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
    */
   public static function setMediaTypesValue(array &$element, $input, FormStateInterface $form_state) {
     if ($input === FALSE) {
-      return isset($element['#default_value']) ? $element['#default_value'] : [];
+      return $element['#default_value'] ?? [];
     }
 
     // Sort the media types by weight value and set the value in the form state.
@@ -276,7 +269,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
       foreach ($media_types as $media_type) {
         $media_type_labels[] = $media_type->label();
       }
-      $summary[] = t('Tab order: @order', ['@order' => implode(', ', $media_type_labels)]);
+      $summary[] = $this->t('Tab order: @order', ['@order' => implode(', ', $media_type_labels)]);
     }
     return $summary;
   }
@@ -298,6 +291,22 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
   /**
    * {@inheritdoc}
    */
+  public function extractFormValues(FieldItemListInterface $items, array $form, FormStateInterface $form_state) {
+    parent::extractFormValues($items, $form, $form_state);
+
+    // Update reference to 'items' stored during add or remove to take into
+    // account changes to values like 'weight' etc.
+    // @see Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::addItems
+    // @see Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::removeItem
+    $field_name = $this->fieldDefinition->getName();
+    $field_state = static::getWidgetState($form['#parents'], $field_name, $form_state);
+    $field_state['items'] = $items->getValue();
+    static::setWidgetState($form['#parents'], $field_name, $form_state, $field_state);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, FormStateInterface $form_state) {
     /** @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $items */
     $referenced_entities = $items->referencedEntities();
@@ -314,15 +323,26 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     $element += [
       '#type' => 'fieldset',
       '#cardinality' => $this->fieldDefinition->getFieldStorageDefinition()->getCardinality(),
-      '#target_bundles' => isset($settings['target_bundles']) ? $settings['target_bundles'] : FALSE,
+      // If no target bundles are specified, all target bundles are allowed.
+      '#target_bundles' => $settings['target_bundles'] ?? [],
       '#attributes' => [
         'id' => $wrapper_id,
-        'class' => ['media-library-widget'],
+        'class' => ['js-media-library-widget'],
+      ],
+      '#pre_render' => [
+        [$this, 'preRenderWidget'],
       ],
       '#attached' => [
         'library' => ['media_library/widget'],
       ],
+      '#theme_wrappers' => [
+        'fieldset__media_library_widget',
+      ],
     ];
+
+    if ($this->fieldDefinition->isRequired()) {
+      $element['#element_validate'][] = [static::class, 'validateRequired'];
+    }
 
     // When the list of allowed types in the field configuration is null,
     // ::getAllowedMediaTypeIdsSorted() returns all existing media types. When
@@ -336,27 +356,23 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
       return $element;
     }
 
+    $multiple_items = FALSE;
     if (empty($referenced_entities)) {
-      $element['empty_selection'] = [
-        '#type' => 'html_tag',
-        '#tag' => 'p',
-        '#value' => $this->t('No media items are selected.'),
-        '#attributes' => [
-          'class' => [
-            'media-library-widget-empty-text',
-          ],
-        ],
+      $element['#field_prefix']['empty_selection'] = [
+        '#markup' => $this->t('No media items are selected.'),
       ];
     }
     else {
-      $element['weight_toggle'] = [
+      // @todo Use a <button> link here.
+      $multiple_items = count($referenced_entities) > 1;
+      $element['#field_prefix']['weight_toggle'] = [
         '#type' => 'html_tag',
         '#tag' => 'button',
         '#value' => $this->t('Show media item weights'),
+        '#access' => $multiple_items,
         '#attributes' => [
           'class' => [
             'link',
-            'media-library-widget__toggle-weight',
             'js-media-library-widget-toggle-weight',
           ],
         ],
@@ -365,21 +381,35 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
 
     $element['selection'] = [
       '#type' => 'container',
+      '#theme_wrappers' => [
+        'container__media_library_widget_selection',
+      ],
       '#attributes' => [
         'class' => [
           'js-media-library-selection',
-          'media-library-selection',
         ],
       ],
     ];
 
     foreach ($referenced_entities as $delta => $media_item) {
+      if ($media_item->access('view')) {
+        // @todo Make the view mode configurable in https://www.drupal.org/project/drupal/issues/2971209
+        $preview = $view_builder->view($media_item, 'media_library');
+      }
+      else {
+        $item_label = $media_item->access('view label') ? $media_item->label() : new FormattableMarkup('@label @id', [
+          '@label' => $media_item->getEntityType()->getSingularLabel(),
+          '@id' => $media_item->id(),
+        ]);
+        $preview = [
+          '#theme' => 'media_embed_error',
+          '#message' => $this->t('You do not have permission to view @item_label.', ['@item_label' => $item_label]),
+        ];
+      }
       $element['selection'][$delta] = [
-        '#type' => 'container',
+        '#theme' => 'media_library_item__widget',
         '#attributes' => [
           'class' => [
-            'media-library-item',
-            'media-library-item--grid',
             'js-media-library-item',
           ],
           // Add the tabindex '-1' to allow the focus to be shifted to the next
@@ -393,32 +423,27 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
           // @see ::updateWidget()
           'data-media-library-item-delta' => $delta,
         ],
-        'preview' => [
-          '#type' => 'container',
-          'remove_button' => [
-            '#type' => 'submit',
-            '#name' => $field_name . '-' . $delta . '-media-library-remove-button' . $id_suffix,
-            '#value' => $this->t('Remove'),
-            '#media_id' => $media_item->id(),
-            '#attributes' => [
-              'class' => ['media-library-item__remove'],
-              'aria-label' => $this->t('Remove @label', ['@label' => $media_item->label()]),
-            ],
-            '#ajax' => [
-              'callback' => [static::class, 'updateWidget'],
-              'wrapper' => $wrapper_id,
-              'progress' => [
-                'type' => 'throbber',
-                'message' => $this->t('Removing @label.', ['@label' => $media_item->label()]),
-              ],
-            ],
-            '#submit' => [[static::class, 'removeItem']],
-            // Prevent errors in other widgets from preventing removal.
-            '#limit_validation_errors' => $limit_validation_errors,
+        'remove_button' => [
+          '#type' => 'submit',
+          '#name' => $field_name . '-' . $delta . '-media-library-remove-button' . $id_suffix,
+          '#value' => $this->t('Remove'),
+          '#media_id' => $media_item->id(),
+          '#attributes' => [
+            'aria-label' => $media_item->access('view label') ? $this->t('Remove @label', ['@label' => $media_item->label()]) : $this->t('Remove media'),
           ],
-          // @todo Make the view mode configurable in https://www.drupal.org/project/drupal/issues/2971209
-          'rendered_entity' => $view_builder->view($media_item, 'media_library'),
+          '#ajax' => [
+            'callback' => [static::class, 'updateWidget'],
+            'wrapper' => $wrapper_id,
+            'progress' => [
+              'type' => 'throbber',
+              'message' => $media_item->access('view label') ? $this->t('Removing @label.', ['@label' => $media_item->label()]) : $this->t('Removing media.'),
+            ],
+          ],
+          '#submit' => [[static::class, 'removeItem']],
+          // Prevent errors in other widgets from preventing removal.
+          '#limit_validation_errors' => $limit_validation_errors,
         ],
+        'rendered_entity' => $preview,
         'target_id' => [
           '#type' => 'hidden',
           '#value' => $media_item->id(),
@@ -426,12 +451,13 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
         // This hidden value can be toggled visible for accessibility.
         'weight' => [
           '#type' => 'number',
+          '#theme' => 'input__number__media_library_item_weight',
           '#title' => $this->t('Weight'),
+          '#access' => $multiple_items,
           '#default_value' => $delta,
           '#attributes' => [
             'class' => [
               'js-media-library-item-weight',
-              'media-library-item__weight',
             ],
           ],
         ],
@@ -477,22 +503,22 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     // tamper-proof hash in a consistent way.
     if (!$entity->isNew()) {
       $opener_parameters['entity_id'] = (string) $entity->id();
+
+      if ($entity->getEntityType()->isRevisionable()) {
+        $opener_parameters['revision_id'] = (string) $entity->getRevisionId();
+      }
     }
     $state = MediaLibraryState::create('media_library.opener.field_widget', $allowed_media_type_ids, $selected_type_id, $remaining, $opener_parameters);
 
     // Add a button that will load the Media library in a modal using AJAX.
-    $element['media_library_open_button'] = [
-      '#type' => 'submit',
+    $element['open_button'] = [
+      '#type' => 'button',
       '#value' => $this->t('Add media'),
       '#name' => $field_name . '-media-library-open-button' . $id_suffix,
       '#attributes' => [
         'class' => [
-          'media-library-open-button',
           'js-media-library-open-button',
         ],
-        // The jQuery UI dialog automatically moves focus to the first :tabbable
-        // element of the modal, so we need to disable refocus on the button.
-        'data-disable-refocus' => 'true',
       ],
       '#media_library_state' => $state,
       '#ajax' => [
@@ -501,8 +527,10 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
           'type' => 'throbber',
           'message' => $this->t('Opening media library.'),
         ],
+        // The AJAX system automatically moves focus to the first tabbable
+        // element of the modal, so we need to disable refocus on the button.
+        'disable-refocus' => TRUE,
       ],
-      '#submit' => [],
       // Allow the media library to be opened even if there are form errors.
       '#limit_validation_errors' => [],
     ];
@@ -514,8 +542,19 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     // JavaScript by adding the 'data-disabled-focus' attribute.
     // @see Drupal.behaviors.MediaLibraryWidgetDisableButton
     if (!$cardinality_unlimited && $remaining === 0) {
-      $element['media_library_open_button']['#attributes']['data-disabled-focus'] = 'true';
-      $element['media_library_open_button']['#attributes']['class'][] = 'visually-hidden';
+      $triggering_element = $form_state->getTriggeringElement();
+      if ($triggering_element && ($trigger_parents = $triggering_element['#array_parents']) && end($trigger_parents) === 'media_library_update_widget') {
+        // The widget is being rebuilt from a selection change.
+        $element['open_button']['#attributes']['data-disabled-focus'] = 'true';
+        $element['open_button']['#attributes']['class'][] = 'visually-hidden';
+      }
+      else {
+        // The widget is being built without a selection change, so we can just
+        // set the item to disabled now, there is no need to set the focus
+        // first.
+        $element['open_button']['#disabled'] = TRUE;
+        $element['open_button']['#attributes']['class'][] = 'visually-hidden';
+      }
     }
 
     // This hidden field and button are used to add new items to the widget.
@@ -547,10 +586,40 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
       ],
       '#validate' => [[static::class, 'validateItems']],
       '#submit' => [[static::class, 'addItems']],
-      // Prevent errors in other widgets from preventing updates.
-      '#limit_validation_errors' => $limit_validation_errors,
+      // We need to prevent the widget from being validated when no media items
+      // are selected. When a media field is added in a subform, entity
+      // validation is triggered in EntityFormDisplay::validateFormValues().
+      // Since the media item is not added to the form yet, this triggers errors
+      // for required media fields.
+      '#limit_validation_errors' => !empty($referenced_entities) ? $limit_validation_errors : [],
     ];
 
+    return $element;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function trustedCallbacks() {
+    return ['preRenderWidget'];
+  }
+
+  /**
+   * Prepares the widget's render element for rendering.
+   *
+   * @param array $element
+   *   The element to transform.
+   *
+   * @return array
+   *   The transformed element.
+   *
+   * @see ::formElement()
+   */
+  public function preRenderWidget(array $element) {
+    if (isset($element['open_button'])) {
+      $element['#field_suffix']['open_button'] = $element['open_button'];
+      unset($element['open_button']);
+    }
     return $element;
   }
 
@@ -597,7 +666,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
    * {@inheritdoc}
    */
   public function errorElement(array $element, ConstraintViolationInterface $error, array $form, FormStateInterface $form_state) {
-    return isset($element['target_id']) ? $element['target_id'] : FALSE;
+    return $element['target_id'] ?? FALSE;
   }
 
   /**
@@ -629,7 +698,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     // This callback is either invoked from the remove button or the update
     // button, which have different nesting levels.
     $is_remove_button = end($triggering_element['#parents']) === 'remove_button';
-    $length = $is_remove_button ? -4 : -1;
+    $length = $is_remove_button ? -3 : -1;
     if (count($triggering_element['#array_parents']) < abs($length)) {
       throw new \LogicException('The element that triggered the widget update was at an unexpected depth. Triggering element parents were: ' . implode(',', $triggering_element['#array_parents']));
     }
@@ -643,7 +712,8 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
 
     // Announce the updated content to screen readers.
     if ($is_remove_button) {
-      $announcement = t('Removed @label.', ['@label' => Media::load($field_state['removed_item_id'])->label()]);
+      $media_item = Media::load($field_state['removed_item_id']);
+      $announcement = $media_item->access('view label') ? new TranslatableMarkup('@label has been removed.', ['@label' => $media_item->label()]) : new TranslatableMarkup('Media has been removed.');
     }
     else {
       $new_items = count(static::getNewMediaItems($element, $form_state));
@@ -686,7 +756,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     // 'data-disabled-focus' attribute and we also don't want to set the focus
     // here.
     // @see Drupal.behaviors.MediaLibraryWidgetDisableButton
-    elseif ($removed_last || (!$is_remove_button && !isset($element['media_library_open_button']['#attributes']['data-disabled-focus']))) {
+    elseif ($removed_last || (!$is_remove_button && !isset($element['open_button']['#attributes']['data-disabled-focus']))) {
       $response->addCommand(new InvokeCommand("#$wrapper_id .js-media-library-open-button", 'focus'));
     }
 
@@ -702,13 +772,21 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
    *   The form state.
    */
   public static function removeItem(array $form, FormStateInterface $form_state) {
+    // During the form rebuild, formElement() will create field item widget
+    // elements using re-indexed deltas, so clear out FormState::$input to
+    // avoid a mismatch between old and new deltas. The rebuilt elements will
+    // have #default_value set appropriately for the current state of the field,
+    // so nothing is lost in doing this.
+    // @see Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::extractFormValues
     $triggering_element = $form_state->getTriggeringElement();
+    $parents = array_slice($triggering_element['#parents'], 0, -2);
+    NestedArray::setValue($form_state->getUserInput(), $parents, NULL);
 
     // Get the parents required to find the top-level widget element.
     if (count($triggering_element['#array_parents']) < 4) {
       throw new \LogicException('Expected the remove button to be more than four levels deep in the form. Triggering element parents were: ' . implode(',', $triggering_element['#array_parents']));
     }
-    $parents = array_slice($triggering_element['#array_parents'], 0, -4);
+    $parents = array_slice($triggering_element['#array_parents'], 0, -3);
     $element = NestedArray::getValue($form, $parents);
 
     // Get the field state.
@@ -717,7 +795,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     $field_state = static::getFieldState($element, $form_state);
 
     // Get the delta of the item being removed.
-    $delta = array_slice($triggering_element['#array_parents'], -3, 1)[0];
+    $delta = array_slice($triggering_element['#array_parents'], -2, 1)[0];
     if (isset($values['selection'][$delta])) {
       // Add the weight of the removed item to the field state so we can shift
       // focus to the next/previous item in an easy way.
@@ -785,7 +863,7 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
     }, $element['#target_bundles']);
     foreach ($media as $media_item) {
       if ($element['#target_bundles'] && !in_array($media_item->bundle(), $element['#target_bundles'], TRUE)) {
-        $form_state->setError($element, t('The media item "@label" is not of an accepted type. Allowed types: @types', [
+        $form_state->setError($element, new TranslatableMarkup('The media item "@label" is not of an accepted type. Allowed types: @types', [
           '@label' => $media_item->label(),
           '@types' => implode(', ', $bundle_labels),
         ]));
@@ -802,7 +880,17 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
    *   The form state.
    */
   public static function addItems(array $form, FormStateInterface $form_state) {
+    // During the form rebuild, formElement() will create field item widget
+    // elements using re-indexed deltas, so clear out FormState::$input to
+    // avoid a mismatch between old and new deltas. The rebuilt elements will
+    // have #default_value set appropriately for the current state of the field,
+    // so nothing is lost in doing this.
+    // @see Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::extractFormValues
     $button = $form_state->getTriggeringElement();
+    $parents = array_slice($button['#parents'], 0, -1);
+    $parents[] = 'selection';
+    NestedArray::setValue($form_state->getUserInput(), $parents, NULL);
+
     $element = NestedArray::getValue($form, array_slice($button['#array_parents'], 0, -1));
 
     $field_state = static::getFieldState($element, $form_state);
@@ -839,8 +927,11 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
    *   An array of selected media items.
    */
   protected static function getNewMediaItems(array $element, FormStateInterface $form_state) {
-    // Get the new media IDs passed to our hidden button.
-    $values = $form_state->getValues();
+    // Get the new media IDs passed to our hidden button. We need to use the
+    // actual user input, since when #limit_validation_errors is used, the
+    // unvalidated user input is not added to the form state.
+    // @see FormValidator::handleErrorsWithLimitedValidation()
+    $values = $form_state->getUserInput();
     $path = $element['#parents'];
     $value = NestedArray::getValue($values, $path);
 
@@ -872,11 +963,14 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
   protected static function getFieldState(array $element, FormStateInterface $form_state) {
     // Default to using the current selection if the form is new.
     $path = $element['#parents'];
-    $values = NestedArray::getValue($form_state->getValues(), $path);
-    $selection = isset($values['selection']) ? $values['selection'] : [];
+    // We need to use the actual user input, since when #limit_validation_errors
+    // is used, the unvalidated user input is not added to the form state.
+    // @see FormValidator::handleErrorsWithLimitedValidation()
+    $values = NestedArray::getValue($form_state->getUserInput(), $path);
+    $selection = $values['selection'] ?? [];
 
     $widget_state = static::getWidgetState($element['#field_parents'], $element['#field_name'], $form_state);
-    $widget_state['items'] = isset($widget_state['items']) ? $widget_state['items'] : $selection;
+    $widget_state['items'] = $widget_state['items'] ?? $selection;
     return $widget_state;
   }
 
@@ -895,6 +989,36 @@ class MediaLibraryWidget extends WidgetBase implements ContainerFactoryPluginInt
    */
   protected static function setFieldState(array $element, FormStateInterface $form_state, array $field_state) {
     static::setWidgetState($element['#field_parents'], $element['#field_name'], $form_state, $field_state);
+  }
+
+  /**
+   * Validates whether the widget is required and contains values.
+   *
+   * @param array $element
+   *   The form element.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   * @param array $form
+   *   The form array.
+   */
+  public static function validateRequired(array $element, FormStateInterface $form_state, array $form) {
+    // If a remove button triggered submit, this validation isn't needed.
+    if (in_array([static::class, 'removeItem'], $form_state->getSubmitHandlers(), TRUE)) {
+      return;
+    }
+
+    // If user has no access, the validation isn't needed.
+    if (isset($element['#access']) && !$element['#access']) {
+      return;
+    }
+
+    $field_state = static::getFieldState($element, $form_state);
+    // Trigger error if the field is required and no media is present. Although
+    // the Form API's default validation would also catch this, the validation
+    // error message is too vague, so a more precise one is provided here.
+    if (count($field_state['items']) === 0) {
+      $form_state->setError($element, new TranslatableMarkup('@name field is required.', ['@name' => $element['#title']]));
+    }
   }
 
 }

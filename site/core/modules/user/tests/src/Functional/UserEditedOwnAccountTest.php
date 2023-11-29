@@ -12,6 +12,11 @@ use Drupal\user\UserInterface;
  */
 class UserEditedOwnAccountTest extends BrowserTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
+
   public function testUserEditedOwnAccount() {
     // Change account setting 'Who can register accounts?' to Administrators
     // only.
@@ -24,7 +29,8 @@ class UserEditedOwnAccountTest extends BrowserTestBase {
     // Change own username.
     $edit = [];
     $edit['name'] = $this->randomMachineName();
-    $this->drupalPostForm('user/' . $account->id() . '/edit', $edit, t('Save'));
+    $this->drupalGet('user/' . $account->id() . '/edit');
+    $this->submitForm($edit, 'Save');
 
     // Log out.
     $this->drupalLogout();

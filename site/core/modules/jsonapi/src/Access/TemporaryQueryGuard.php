@@ -15,7 +15,6 @@ use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
 use Drupal\jsonapi\Query\EntityCondition;
 use Drupal\jsonapi\Query\EntityConditionGroup;
 use Drupal\jsonapi\Query\Filter;
-use Drupal\workspaces\WorkspaceInterface;
 
 /**
  * Adds sufficient access control to collection queries.
@@ -33,7 +32,7 @@ use Drupal\workspaces\WorkspaceInterface;
  * @see https://www.drupal.org/project/drupal/issues/2809177
  * @see https://www.drupal.org/project/drupal/issues/777578
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  */
 class TemporaryQueryGuard {
@@ -151,7 +150,7 @@ class TemporaryQueryGuard {
         // portion. JSON:API will have already validated that the property
         // exists.
         $split_specifier = explode(':', $specifier, 2);
-        list($property_name, $target_entity_type_id) = array_merge($split_specifier, count($split_specifier) === 2 ? [] : [NULL]);
+        [$property_name, $target_entity_type_id] = array_merge($split_specifier, count($split_specifier) === 2 ? [] : [NULL]);
         // The specifier is either a field property or a delta. If it is a data
         // reference or a delta, then it needs to be traversed to the next
         // specifier. However, if the specific is a simple field property, i.e.
@@ -306,20 +305,6 @@ class TemporaryQueryGuard {
         // @see \Drupal\user\UserAccessControlHandler::checkAccess()
         $specific_condition = new EntityCondition('uid', '0', '!=');
         break;
-
-      case 'workspace':
-        // The default workspace is always viewable, no matter what, so if
-        // the generic condition prevents that, add an OR.
-        // @see \Drupal\workspaces\WorkspaceAccessControlHandler::checkAccess()
-        if ($generic_condition) {
-          $specific_condition = new EntityConditionGroup('OR', [
-            $generic_condition,
-            new EntityCondition('id', WorkspaceInterface::DEFAULT_WORKSPACE),
-          ]);
-          // The generic condition is now part of the specific condition.
-          $generic_condition = NULL;
-        }
-        break;
     }
 
     // Return a combined condition.
@@ -445,7 +430,7 @@ class TemporaryQueryGuard {
    *   hook_jsonapi_entity_filter_access() for details.
    */
   protected static function getAccessResultsFromEntityFilterHook(EntityTypeInterface $entity_type, AccountInterface $account) {
-    /* @var \Drupal\Core\Access\AccessResultInterface[] $combined_access_results */
+    /** @var \Drupal\Core\Access\AccessResultInterface[] $combined_access_results */
     $combined_access_results = [
       JSONAPI_FILTER_AMONG_ALL => AccessResult::neutral(),
       JSONAPI_FILTER_AMONG_PUBLISHED => AccessResult::neutral(),
@@ -457,14 +442,17 @@ class TemporaryQueryGuard {
     // hook_jsonapi_ENTITY_TYPE_filter_access() for each module and merge its
     // results with the combined results.
     foreach (['jsonapi_entity_filter_access', 'jsonapi_' . $entity_type->id() . '_filter_access'] as $hook) {
-      foreach (static::$moduleHandler->getImplementations($hook) as $module) {
-        $module_access_results = static::$moduleHandler->invoke($module, $hook, [$entity_type, $account]);
-        if ($module_access_results) {
-          foreach ($module_access_results as $subset => $access_result) {
-            $combined_access_results[$subset] = $combined_access_results[$subset]->orIf($access_result);
+      static::$moduleHandler->invokeAllWith(
+        $hook,
+        function (callable $hook, string $module) use (&$combined_access_results, $entity_type, $account) {
+          $module_access_results = $hook($entity_type, $account);
+          if ($module_access_results) {
+            foreach ($module_access_results as $subset => $access_result) {
+              $combined_access_results[$subset] = $combined_access_results[$subset]->orIf($access_result);
+            }
           }
         }
-      }
+      );
     }
 
     return $combined_access_results;
@@ -603,7 +591,7 @@ class TemporaryQueryGuard {
       // This complex expression is needed to handle the string, "0", which
       // would be evaluated as FALSE.
       if (!is_null(($field_name = array_shift($parts)))) {
-        $previous = isset($merged[$field_name]) ? $merged[$field_name] : [];
+        $previous = $merged[$field_name] ?? [];
         $merged[$field_name] = array_merge($previous, [$parts]);
       }
     }

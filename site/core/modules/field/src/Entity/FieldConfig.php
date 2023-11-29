@@ -44,6 +44,11 @@ use Drupal\field\FieldConfigInterface;
  *     "default_value_callback",
  *     "settings",
  *     "field_type",
+ *   },
+ *   constraints = {
+ *     "RequiredConfigDependencies" = {
+ *       "field_storage_config"
+ *     }
  *   }
  * )
  */
@@ -72,6 +77,11 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
   protected $fieldStorage;
 
   /**
+   * The original FieldConfig entity.
+   */
+  public FieldConfig $original;
+
+  /**
    * Constructs a FieldConfig object.
    *
    * In most cases, Field entities are created via
@@ -90,8 +100,9 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
    *   bundle to which the field is attached to. Other array elements will be
    *   used to set the corresponding properties on the class; see the class
    *   property documentation for details.
-   *
-   * @see entity_create()
+   * @param string $entity_type
+   *   (optional) The entity type on which the field should be created.
+   *   Defaults to "field_config".
    */
   public function __construct(array $values, $entity_type = 'field_config') {
     // Allow either an injected FieldStorageConfig object, or a field_name and
@@ -149,7 +160,6 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
    *   In case of failures at the configuration storage level.
    */
   public function preSave(EntityStorageInterface $storage) {
-    $entity_manager = \Drupal::entityManager();
     $field_type_manager = \Drupal::service('plugin.manager.field.field_type');
 
     $storage_definition = $this->getFieldStorageDefinition();
@@ -222,16 +232,7 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
    * {@inheritdoc}
    */
   public static function postDelete(EntityStorageInterface $storage, array $fields) {
-    // Clear the cache upfront, to refresh the results of getBundles().
-    \Drupal::service('entity_field.manager')->clearCachedFieldDefinitions();
-
-    // Notify the entity storage.
-    foreach ($fields as $field) {
-      if (!$field->deleted) {
-        \Drupal::service('field_definition.listener')->onFieldDefinitionDelete($field);
-      }
-    }
-
+    parent::postDelete($storage, $fields);
     // If this is part of a configuration synchronization then the following
     // configuration updates are not necessary.
     $entity = reset($fields);
@@ -250,7 +251,7 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
       }
     }
     if ($storages_to_delete) {
-      \Drupal::entityManager()->getStorage('field_storage_config')->delete($storages_to_delete);
+      \Drupal::entityTypeManager()->getStorage('field_storage_config')->delete($storages_to_delete);
     }
   }
 
@@ -276,7 +277,7 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
    */
   protected function urlRouteParameters($rel) {
     $parameters = parent::urlRouteParameters($rel);
-    $entity_type = \Drupal::entityManager()->getDefinition($this->entity_type);
+    $entity_type = \Drupal::entityTypeManager()->getDefinition($this->entity_type);
     $bundle_parameter_key = $entity_type->getBundleEntityType() ?: 'bundle';
     $parameters[$bundle_parameter_key] = $this->bundle;
     return $parameters;
@@ -312,10 +313,10 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
       }
 
       if (!$field_storage_definition) {
-        throw new FieldException("Attempt to create a field {$this->field_name} that does not exist on entity type {$this->entity_type}.");
+        throw new FieldException("Attempted to create an instance of field with name {$this->field_name} on entity type {$this->entity_type} when the field storage does not exist.");
       }
       if (!$field_storage_definition instanceof FieldStorageConfigInterface) {
-        throw new FieldException("Attempt to create a configurable field of non-configurable field storage {$this->field_name}.");
+        throw new FieldException("Attempted to create a configurable field of non-configurable field storage {$this->field_name}.");
       }
       $this->fieldStorage = $field_storage_definition;
     }
@@ -369,12 +370,12 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
    * @param string $field_name
    *   Name of the field.
    *
-   * @return static
+   * @return \Drupal\field\FieldConfigInterface|null
    *   The field config entity if one exists for the provided field
    *   name, otherwise NULL.
    */
   public static function loadByName($entity_type_id, $bundle, $field_name) {
-    return \Drupal::entityManager()->getStorage('field_config')->load($entity_type_id . '.' . $bundle . '.' . $field_name);
+    return \Drupal::entityTypeManager()->getStorage('field_config')->load($entity_type_id . '.' . $bundle . '.' . $field_name);
   }
 
 }

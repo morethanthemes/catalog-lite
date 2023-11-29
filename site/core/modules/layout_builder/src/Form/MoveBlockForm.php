@@ -5,6 +5,7 @@ namespace Drupal\layout_builder\Form;
 use Drupal\Core\Ajax\AjaxFormHelperTrait;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\layout_builder\Context\LayoutBuilderContextTrait;
 use Drupal\layout_builder\Controller\LayoutRebuildTrait;
 use Drupal\layout_builder\LayoutBuilderHighlightTrait;
 use Drupal\layout_builder\LayoutTempstoreRepositoryInterface;
@@ -20,6 +21,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class MoveBlockForm extends FormBase {
 
   use AjaxFormHelperTrait;
+  use LayoutBuilderContextTrait;
   use LayoutBuilderHighlightTrait;
   use LayoutRebuildTrait;
 
@@ -119,16 +121,19 @@ class MoveBlockForm extends FormBase {
     $form['#attributes']['data-layout-builder-target-highlight-id'] = $this->blockUpdateHighlightId($uuid);
 
     $sections = $section_storage->getSections();
+    $contexts = $this->getPopulatedContexts($section_storage);
     $region_options = [];
     foreach ($sections as $section_delta => $section) {
-      $layout = $section->getLayout();
+      $layout = $section->getLayout($contexts);
       $layout_definition = $layout->getPluginDefinition();
-      $section_label = $this->t('Section: @delta', ['@delta' => $section_delta + 1])->render();
+      if (!($section_label = $section->getLayoutSettings()['label'])) {
+        $section_label = $this->t('Section: @delta', ['@delta' => $section_delta + 1])->render();
+      }
       foreach ($layout_definition->getRegions() as $region_name => $region_info) {
         // Group regions by section.
         $region_options[$section_label]["$section_delta:$region_name"] = $this->t(
-          'Section: @delta, Region: @region',
-          ['@delta' => $section_delta + 1, '@region' => $region_info['label']]
+          '@section, Region: @region',
+          ['@section' => $section_label, '@region' => $region_info['label']]
         );
       }
     }
@@ -155,7 +160,7 @@ class MoveBlockForm extends FormBase {
     $form['components_wrapper']['components'] = [
       '#type' => 'table',
       '#header' => [
-        $this->t('Block Label'),
+        $this->t('Block label'),
         $this->t('Weight'),
       ],
       '#tabledrag' => [
@@ -185,6 +190,7 @@ class MoveBlockForm extends FormBase {
     if (!isset($components[$uuid])) {
       $components[$uuid] = $sections[$delta]->getComponent($uuid);
     }
+    $state_weight_delta = round(count($components) / 2);
     foreach ($components as $component_uuid => $component) {
       /** @var \Drupal\Core\Block\BlockPluginInterface $plugin */
       $plugin = $component->getPlugin();
@@ -217,6 +223,7 @@ class MoveBlockForm extends FormBase {
           '#attributes' => [
             'class' => ['table-sort-weight'],
           ],
+          '#delta' => $state_weight_delta,
         ],
       ];
     }

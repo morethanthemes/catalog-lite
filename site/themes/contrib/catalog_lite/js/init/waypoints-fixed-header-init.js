@@ -1,12 +1,12 @@
-(function ($, Drupal) {
+(function ($, Drupal, once) {
   Drupal.behaviors.mtWaypointsFixedHeader = {
     attach: function (context, settings) {
-      $(context).find(".header-container .header").once('mtWaypointsFixedHeaderInit').each(function(index, item) {
+      once('mtWaypointsFixedHeaderInit', ".header-container .header", context).forEach(function(item) {
         var sticky = new Waypoint.Sticky ({
           element: $('.header-container .header')[0],
           stuckClass: 'js-fixed',
           handler: function(direction) {
-            if (Waypoint.viewportWidth() > 752) {
+            if (Waypoint.viewportWidth() > 974) {
               $('body', context).toggleClass('onscroll');
             } else {
               $('body', context).removeClass('onscroll');
@@ -22,4 +22,4 @@
       });
     }
   };
-})(jQuery, Drupal);
+})(jQuery, Drupal, once);

@@ -11,6 +11,7 @@ use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\media_library\MediaLibraryState;
+use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\views\Views;
 
@@ -22,6 +23,7 @@ use Drupal\views\Views;
 class MediaLibraryAccessTest extends KernelTestBase {
 
   use UserCreationTrait;
+  use MediaTypeCreationTrait;
 
   /**
    * {@inheritdoc}
@@ -31,6 +33,7 @@ class MediaLibraryAccessTest extends KernelTestBase {
     'media',
     'media_library',
     'media_library_test',
+    'filter',
     'file',
     'field',
     'image',
@@ -42,14 +45,15 @@ class MediaLibraryAccessTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->installEntitySchema('user');
     $this->installEntitySchema('file');
     $this->installSchema('file', 'file_usage');
-    $this->installSchema('system', ['sequences', 'key_value_expire']);
+    $this->installSchema('system', ['sequences']);
     $this->installEntitySchema('entity_test');
+    $this->installEntitySchema('filter_format');
     $this->installEntitySchema('media');
     $this->installConfig([
       'field',
@@ -125,6 +129,76 @@ class MediaLibraryAccessTest extends KernelTestBase {
   }
 
   /**
+   * @covers \Drupal\media_library\MediaLibraryEditorOpener::checkAccess
+   *
+   * @param bool $media_embed_enabled
+   *   Whether to test with media_embed filter enabled on the text format.
+   * @param bool $can_use_format
+   *   Whether the logged in user is allowed to use the text format.
+   *
+   * @dataProvider editorOpenerAccessProvider
+   */
+  public function testEditorOpenerAccess($media_embed_enabled, $can_use_format) {
+    $format = $this->container
+      ->get('entity_type.manager')
+      ->getStorage('filter_format')->create([
+        'format' => $this->randomMachineName(),
+        'name' => $this->randomString(),
+        'filters' => [
+          'media_embed' => ['status' => $media_embed_enabled],
+        ],
+      ]);
+    $format->save();
+
+    $permissions = [
+      'access media overview',
+      'view media',
+    ];
+    if ($can_use_format) {
+      $permissions[] = $format->getPermissionName();
+    }
+
+    $state = MediaLibraryState::create(
+      'media_library.opener.editor',
+      ['image'],
+      'image',
+      1,
+      ['filter_format_id' => $format->id()]
+    );
+
+    $access_result = $this->container
+      ->get('media_library.ui_builder')
+      ->checkAccess($this->createUser($permissions), $state);
+
+    if ($media_embed_enabled && $can_use_format) {
+      $this->assertAccess($access_result, TRUE, NULL, Views::getView('media_library')->storage->getCacheTags(), ['user.permissions']);
+    }
+    else {
+      $this->assertAccess($access_result, FALSE, NULL, [], ['user.permissions']);
+    }
+  }
+
+  /**
+   * Data provider for ::testEditorOpenerAccess.
+   */
+  public function editorOpenerAccessProvider() {
+    return [
+      'media_embed filter enabled' => [
+        TRUE,
+        TRUE,
+      ],
+      'media_embed filter disabled' => [
+        FALSE,
+        TRUE,
+      ],
+      'media_embed filter enabled, user not allowed to use text format' => [
+        TRUE,
+        FALSE,
+      ],
+    ];
+  }
+
+  /**
    * Tests that the field widget opener respects entity-specific access.
    */
   public function testFieldWidgetEntityEditAccess() {
@@ -183,11 +257,29 @@ class MediaLibraryAccessTest extends KernelTestBase {
   }
 
   /**
-   * Tests that the field widget opener respects entity field-level access.
+   * Data provider for ::testFieldWidgetEntityFieldAccess().
+   *
+   * @return array[]
+   *   Sets of arguments to pass to the test method.
    */
-  public function testFieldWidgetEntityFieldAccess() {
+  public function providerFieldWidgetEntityFieldAccess(): array {
+    return [
+      ['entity_reference'],
+      ['entity_reference_subclass'],
+    ];
+  }
+
+  /**
+   * Tests that the field widget opener respects entity field-level access.
+   *
+   * @param string $field_type
+   *   The field type.
+   *
+   * @dataProvider providerFieldWidgetEntityFieldAccess
+   */
+  public function testFieldWidgetEntityFieldAccess(string $field_type) {
     $field_storage = FieldStorageConfig::create([
-      'type' => 'entity_reference',
+      'type' => $field_type,
       'entity_type' => 'entity_test',
       // The media_library_test module will deny access to this field.
       // @see media_library_test_entity_field_access()
@@ -297,6 +389,34 @@ class MediaLibraryAccessTest extends KernelTestBase {
   }
 
   /**
+   * Tests that the media library respects arbitrary access to the add form.
+   */
+  public function testAddFormAccess(): void {
+    // Access is denied if the media library is trying to create media whose
+    // type name is 'deny_access'. Also create a second media type that we *can*
+    // add, so we can be certain that the add form is otherwise visible.
+    // @see media_library_test_media_create_access()
+    $media_types = [
+      $this->createMediaType('image', ['id' => 'deny_access'])->id(),
+      $this->createMediaType('image')->id(),
+    ];
+
+    $account = $this->createUser(['create media']);
+    $this->setCurrentUser($account);
+
+    /** @var \Drupal\media_library\MediaLibraryUiBuilder $ui_builder */
+    $ui_builder = $this->container->get('media_library.ui_builder');
+
+    $state = MediaLibraryState::create('test', $media_types, $media_types[0], 1);
+    $build = $ui_builder->buildUi($state);
+    $this->assertEmpty($build['content']['form']);
+
+    $state = MediaLibraryState::create('test', $media_types, $media_types[1], 1);
+    $build = $ui_builder->buildUi($state);
+    $this->assertNotEmpty($build['content']['form']);
+  }
+
+  /**
    * Asserts various aspects of an access result.
    *
    * @param \Drupal\Core\Access\AccessResult $access_result
@@ -310,13 +430,13 @@ class MediaLibraryAccessTest extends KernelTestBase {
    * @param string[] $expected_cache_contexts
    *   (optional) The expected cache contexts attached to the access result.
    */
-  private function assertAccess(AccessResult $access_result, $is_allowed, $expected_reason = NULL, array $expected_cache_tags = [], array $expected_cache_contexts = []) {
+  private function assertAccess(AccessResult $access_result, bool $is_allowed, string $expected_reason = NULL, array $expected_cache_tags = [], array $expected_cache_contexts = []): void {
     $this->assertSame($is_allowed, $access_result->isAllowed());
     if ($access_result instanceof AccessResultReasonInterface && isset($expected_reason)) {
       $this->assertSame($expected_reason, $access_result->getReason());
     }
-    $this->assertSame($expected_cache_tags, $access_result->getCacheTags());
-    $this->assertSame($expected_cache_contexts, $access_result->getCacheContexts());
+    $this->assertEqualsCanonicalizing($expected_cache_tags, $access_result->getCacheTags());
+    $this->assertEqualsCanonicalizing($expected_cache_contexts, $access_result->getCacheContexts());
   }
 
 }

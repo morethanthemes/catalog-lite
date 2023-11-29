@@ -6,6 +6,7 @@
 
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Template\Attribute;
+use Drupal\node\NodeInterface;
 
 /**
  * Implements hook_preprocess_HOOK() for HTML document templates.
@@ -142,7 +143,7 @@ function catalog_lite_preprocess_html(&$variables) {
 
   // Add page-node-id class to body
   $node = \Drupal::request()->attributes->get('node');
-  if (!empty($node) && $node instanceof \Drupal\node\NodeInterface) {
+  if (!empty($node) && $node instanceof NodeInterface) {
     $variables['attributes']['class'][] = 'page-node-' . $node->id();
   }
 
@@ -317,15 +318,15 @@ function catalog_lite_preprocess_page(&$variables) {
     $variables['main_grid_class'] = 'col-lg-8';
     $variables['sidebar_first_grid_class'] = '';
     $variables['sidebar_second_grid_class'] = 'col-lg-4';
-  } elseif ((!$sidebar_first && !$sidebar_second) && (isset($variables['node']) && !empty($variables['node']) && $variables['node'] instanceof \Drupal\node\NodeInterface) && ($variables['node']->get('title')->value == 'Front page')) {
+  } elseif ((!$sidebar_first && !$sidebar_second) && (isset($variables['node']) && !empty($variables['node']) && $variables['node'] instanceof NodeInterface) && ($variables['node']->get('title')->value == 'Front page')) {
     $variables['main_grid_class'] = 'col-12';
     $variables['sidebar_first_grid_class'] = '';
     $variables['sidebar_second_grid_class'] = '';
-  } elseif ((!$sidebar_first && !$sidebar_second) && (isset($variables['node']) && !empty($variables['node']) && $variables['node'] instanceof \Drupal\node\NodeInterface) && ($variables['node']->getType() == 'page')) {
+  } elseif ((!$sidebar_first && !$sidebar_second) && (isset($variables['node']) && !empty($variables['node']) && $variables['node'] instanceof NodeInterface) && ($variables['node']->getType() == 'page')) {
     $variables['main_grid_class'] = 'col-12 col-xl-8 ml-xl-auto mr-xl-auto';
     $variables['sidebar_first_grid_class'] = '';
     $variables['sidebar_second_grid_class'] = '';
-  } elseif ((!$sidebar_first && !$sidebar_second) && (isset($variables['node']) && !empty($variables['node']) && $variables['node'] instanceof \Drupal\node\NodeInterface) && ($variables['node']->getType() == 'article')) {
+  } elseif ((!$sidebar_first && !$sidebar_second) && (isset($variables['node']) && !empty($variables['node']) && $variables['node'] instanceof NodeInterface) && ($variables['node']->getType() == 'article')) {
     $variables['main_grid_class'] = 'col-12 col-xl-10 ml-xl-auto mr-xl-auto';
     $variables['sidebar_first_grid_class'] = '';
     $variables['sidebar_second_grid_class'] = '';
@@ -740,7 +741,7 @@ function catalog_lite_preprocess_page(&$variables) {
 function catalog_lite_theme_suggestions_page_alter(array &$suggestions, array $variables) {
   // Add content type suggestions.
   $node = \Drupal::request()->attributes->get('node');
-  if (!empty($node) && $node instanceof \Drupal\node\NodeInterface) {
+  if (!empty($node) && $node instanceof NodeInterface) {
     array_splice($suggestions, 1, 0, 'page__node__' . $node->getType());
   }
 
@@ -821,11 +822,11 @@ function catalog_lite_preprocess_node__article(&$variables) {
 
   // Count the words of article in order to calculate the reading time
   $node_content = $variables['content'];
-  $node_content = render($node_content);
+  $node_content = \Drupal::service('renderer')->render($node_content);
   $words = str_word_count(strip_tags($node_content));
   if (isset($variables['content']['comment'])) {
     $node_comments = $variables['content']['comment'];
-    $node_comments = render($node_comments);
+    $node_comments = \Drupal::service('renderer')->render($node_comments);
     $words = $words - str_word_count(strip_tags($node_comments));
   }
   $variables['minutes'] = floor($words / 275);

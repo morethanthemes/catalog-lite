@@ -37,7 +37,7 @@ class TimestampNormalizerTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->normalizer = new TimestampNormalizer($this->prophesize(ConfigFactoryInterface::class)->reveal());
@@ -122,7 +122,8 @@ class TimestampNormalizerTest extends UnitTestCase {
    * @covers ::denormalize
    */
   public function testDenormalizeException() {
-    $this->setExpectedException(UnexpectedValueException::class, 'The specified date "2016/11/06 09:02am GMT" is not in an accepted format: "U" (UNIX timestamp), "Y-m-d\TH:i:sO" (ISO 8601), "Y-m-d\TH:i:sP" (RFC 3339).');
+    $this->expectException(UnexpectedValueException::class);
+    $this->expectExceptionMessage('The specified date "2016/11/06 09:02am GMT" is not in an accepted format: "U" (UNIX timestamp), "Y-m-d\TH:i:sO" (ISO 8601), "Y-m-d\TH:i:sP" (RFC 3339).');
 
     $normalized = '2016/11/06 09:02am GMT';
 
@@ -132,6 +133,8 @@ class TimestampNormalizerTest extends UnitTestCase {
 }
 
 /**
+ * Provides a test class for testing DrupalDateTime.
+ *
  * Note: Prophecy does not support magic methods. By subclassing and specifying
  * an explicit method, Prophecy works.
  * @see https://github.com/phpspec/prophecy/issues/338

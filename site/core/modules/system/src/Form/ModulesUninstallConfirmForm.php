@@ -4,8 +4,8 @@ namespace Drupal\system\Form;
 
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\Config\Entity\ConfigDependencyDeleteFormTrait;
-use Drupal\Core\DependencyInjection\DeprecatedServicePropertyTrait;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Form\ConfirmFormBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -20,14 +20,6 @@ use Drupal\Core\KeyValueStore\KeyValueStoreExpirableInterface;
  */
 class ModulesUninstallConfirmForm extends ConfirmFormBase {
   use ConfigDependencyDeleteFormTrait;
-  use DeprecatedServicePropertyTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $deprecatedProperties = [
-    'entityManager' => 'entity.manager',
-  ];
 
   /**
    * The module installer service.
@@ -65,6 +57,13 @@ class ModulesUninstallConfirmForm extends ConfirmFormBase {
   protected $modules = [];
 
   /**
+   * The module extension list.
+   *
+   * @var \Drupal\Core\Extension\ModuleExtensionList
+   */
+  protected $moduleExtensionList;
+
+  /**
    * Constructs a ModulesUninstallConfirmForm object.
    *
    * @param \Drupal\Core\Extension\ModuleInstallerInterface $module_installer
@@ -75,12 +74,15 @@ class ModulesUninstallConfirmForm extends ConfirmFormBase {
    *   The configuration manager.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   The entity type manager.
+   * @param \Drupal\Core\Extension\ModuleExtensionList $extension_list_module
+   *   The module extension list.
    */
-  public function __construct(ModuleInstallerInterface $module_installer, KeyValueStoreExpirableInterface $key_value_expirable, ConfigManagerInterface $config_manager, EntityTypeManagerInterface $entity_type_manager) {
+  public function __construct(ModuleInstallerInterface $module_installer, KeyValueStoreExpirableInterface $key_value_expirable, ConfigManagerInterface $config_manager, EntityTypeManagerInterface $entity_type_manager, ModuleExtensionList $extension_list_module) {
     $this->moduleInstaller = $module_installer;
     $this->keyValueExpirable = $key_value_expirable;
     $this->configManager = $config_manager;
     $this->entityTypeManager = $entity_type_manager;
+    $this->moduleExtensionList = $extension_list_module;
   }
 
   /**
@@ -91,7 +93,8 @@ class ModulesUninstallConfirmForm extends ConfirmFormBase {
       $container->get('module_installer'),
       $container->get('keyvalue.expirable')->get('modules_uninstall'),
       $container->get('config.manager'),
-      $container->get('entity_type.manager')
+      $container->get('entity_type.manager'),
+      $container->get('extension.list.module')
     );
   }
 
@@ -144,7 +147,7 @@ class ModulesUninstallConfirmForm extends ConfirmFormBase {
       return $this->redirect('system.modules_uninstall');
     }
 
-    $data = system_rebuild_module_data();
+    $data = $this->moduleExtensionList->getList();
     $form['text']['#markup'] = '<p>' . $this->t('The following modules will be completely uninstalled from your site, and <em>all data from these modules will be lost</em>!') . '</p>';
     $form['modules'] = [
       '#theme' => 'item_list',

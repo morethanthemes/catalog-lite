@@ -67,7 +67,7 @@ class SectionRenderTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $layout_plugin_manager = $this->prophesize(LayoutPluginManagerInterface::class);
@@ -110,14 +110,12 @@ class SectionRenderTest extends UnitTestCase {
       '#base_plugin_id' => 'block_plugin_id',
       '#derivative_plugin_id' => NULL,
       'content' => $block_content,
-      '#attributes' => [
-        'data-layout-content-preview-placeholder-label' => $placeholder_label,
-      ],
       '#cache' => [
         'contexts' => [],
         'tags' => [],
         'max-age' => -1,
       ],
+      '#in_preview' => FALSE,
     ];
 
     $block = $this->prophesize(BlockPluginInterface::class)->willImplement(PreviewFallbackInterface::class);
@@ -201,6 +199,7 @@ class SectionRenderTest extends UnitTestCase {
         'tags' => [],
         'max-age' => 0,
       ],
+      '#in_preview' => TRUE,
     ];
     $block = $this->prophesize(BlockPluginInterface::class)->willImplement(PreviewFallbackInterface::class);
     $this->blockManager->createInstance('block_plugin_id', ['id' => 'block_plugin_id'])->willReturn($block->reveal());
@@ -252,14 +251,12 @@ class SectionRenderTest extends UnitTestCase {
       '#base_plugin_id' => 'block_plugin_id',
       '#derivative_plugin_id' => NULL,
       'content' => $block_content,
-      '#attributes' => [
-        'data-layout-content-preview-placeholder-label' => $placeholder_label,
-      ],
       '#cache' => [
         'contexts' => [],
         'tags' => [],
         'max-age' => -1,
       ],
+      '#in_preview' => FALSE,
     ];
 
     $block = $this->prophesize(BlockPluginInterface::class)
@@ -296,7 +293,8 @@ class SectionRenderTest extends UnitTestCase {
    * @covers ::toRenderArray
    */
   public function testToRenderArrayMissingPluginId() {
-    $this->setExpectedException(PluginException::class, 'No plugin ID specified for component with "some_uuid" UUID');
+    $this->expectException(PluginException::class);
+    $this->expectExceptionMessage('No plugin ID specified for component with "some_uuid" UUID');
     (new Section('layout_onecol', [], [new SectionComponent('some_uuid', 'content')]))->toRenderArray();
   }
 

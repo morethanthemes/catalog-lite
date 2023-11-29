@@ -30,11 +30,6 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
   ];
 
   /**
-   * {@inheritdoc}
-   */
-  protected $supportedInterfaceOrClass = DateTimeInterface::class;
-
-  /**
    * The system's date configuration.
    *
    * @var \Drupal\Core\Config\ImmutableConfig
@@ -54,7 +49,7 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
   /**
    * {@inheritdoc}
    */
-  public function normalize($datetime, $format = NULL, array $context = []) {
+  public function normalize($datetime, $format = NULL, array $context = []): array|string|int|float|bool|\ArrayObject|NULL {
     assert($datetime instanceof DateTimeInterface);
     $drupal_date_time = $datetime->getDateTime();
     if ($drupal_date_time === NULL) {
@@ -64,8 +59,6 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
       // Set an explicit timezone. Otherwise, timestamps may end up being
       // normalized using the user's preferred timezone. Which would result in
       // many variations and complex caching.
-      // @see \Drupal\Core\Datetime\DrupalDateTime::prepareTimezone()
-      // @see drupal_get_user_timezone()
       ->setTimezone($this->getNormalizationTimezone())
       ->format(\DateTime::RFC3339);
   }
@@ -74,8 +67,9 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
    * Gets the timezone to be used during normalization.
    *
    * @see ::normalize
+   * @see \Drupal\Core\Datetime\DrupalDateTime::prepareTimezone()
    *
-   * @returns \DateTimeZone
+   * @return \DateTimeZone
    *   The timezone to use.
    */
   protected function getNormalizationTimezone() {
@@ -86,7 +80,7 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
   /**
    * {@inheritdoc}
    */
-  public function denormalize($data, $class, $format = NULL, array $context = []) {
+  public function denormalize($data, $class, $format = NULL, array $context = []): mixed {
     // This only knows how to denormalize datetime strings and timestamps. If
     // something else is received, let validation constraints handle this.
     if (!is_string($data) && !is_numeric($data)) {
@@ -97,9 +91,7 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
     // input data if it matches the defined pattern. Since the formats are
     // unambiguous (i.e., they reference an absolute time with a defined time
     // zone), only one will ever match.
-    $allowed_formats = isset($context['datetime_allowed_formats'])
-      ? $context['datetime_allowed_formats']
-      : $this->allowedFormats;
+    $allowed_formats = $context['datetime_allowed_formats'] ?? $this->allowedFormats;
     foreach ($allowed_formats as $format) {
       $date = \DateTime::createFromFormat($format, $data);
       $errors = \DateTime::getLastErrors();
@@ -116,6 +108,24 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
 
     $formats = implode(', ', $format_strings);
     throw new UnexpectedValueException(sprintf('The specified date "%s" is not in an accepted format: %s.', $data, $formats));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasCacheableSupportsMethod(): bool {
+    @trigger_error(__METHOD__ . '() is deprecated in drupal:10.1.0 and is removed from drupal:11.0.0. Use getSupportedTypes() instead. See https://www.drupal.org/node/3359695', E_USER_DEPRECATED);
+
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSupportedTypes(?string $format): array {
+    return [
+      DateTimeInterface::class => TRUE,
+    ];
   }
 
 }

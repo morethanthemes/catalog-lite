@@ -9,12 +9,15 @@ use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\RevisionableInterface;
+use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
 use Drupal\Core\Url;
 use Drupal\jsonapi\JsonApiSpec;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\Revisions\VersionByRel;
 use Drupal\jsonapi\Routing\Routes;
+use Drupal\user\UserInterface;
 
 /**
  * Represents a JSON:API resource object.
@@ -26,7 +29,7 @@ use Drupal\jsonapi\Routing\Routes;
  * @internal JSON:API maintains no PHP API. The API is the HTTP API. This class
  *   may change at any time and could break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  */
 class ResourceObject implements CacheableDependencyInterface, ResourceIdentifierInterface {
@@ -60,6 +63,13 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
   protected $links;
 
   /**
+   * The resource language.
+   *
+   * @var \Drupal\Core\Language\LanguageInterface
+   */
+  protected $language;
+
+  /**
    * ResourceObject constructor.
    *
    * @param \Drupal\Core\Cache\CacheableDependencyInterface $cacheability
@@ -75,8 +85,10 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
    *   An array of the resource object's fields, keyed by public field name.
    * @param \Drupal\jsonapi\JsonApiResource\LinkCollection $links
    *   The links for the resource object.
+   * @param \Drupal\Core\Language\LanguageInterface|null $language
+   *   (optional) The resource language.
    */
-  public function __construct(CacheableDependencyInterface $cacheability, ResourceType $resource_type, $id, $revision_id, array $fields, LinkCollection $links) {
+  public function __construct(CacheableDependencyInterface $cacheability, ResourceType $resource_type, $id, $revision_id, array $fields, LinkCollection $links, LanguageInterface $language = NULL) {
     assert(is_null($revision_id) || $resource_type->isVersionable());
     $this->setCacheability($cacheability);
     $this->resourceType = $resource_type;
@@ -84,6 +96,10 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
     $this->versionIdentifier = $revision_id ? 'id:' . $revision_id : NULL;
     $this->fields = $fields;
     $this->links = $links->withContext($this);
+
+    // If the specified language empty it falls back the same way as in the entity system
+    // @see \Drupal\Core\Entity\EntityBase::language()
+    $this->language = $language ?: new Language(['id' => LanguageInterface::LANGCODE_NOT_SPECIFIED]);
   }
 
   /**
@@ -108,7 +124,8 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
       $entity->uuid(),
       $resource_type->isVersionable() && $entity instanceof RevisionableInterface ? $entity->getRevisionId() : NULL,
       static::extractFieldsFromEntity($resource_type, $entity),
-      static::buildLinksFromEntity($resource_type, $entity, $links ?: new LinkCollection([]))
+      static::buildLinksFromEntity($resource_type, $entity, $links ?: new LinkCollection([])),
+      $entity->language()
     );
   }
 
@@ -150,6 +167,16 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
    */
   public function getFields() {
     return $this->fields;
+  }
+
+  /**
+   * Gets the ResourceObject's language.
+   *
+   * @return \Drupal\Core\Language\LanguageInterface
+   *   The resource language.
+   */
+  public function getLanguage(): LanguageInterface {
+    return $this->language;
   }
 
   /**
@@ -243,19 +270,19 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
           // revision changes and to disambiguate resource objects with the same
           // `type` and `id` in a `version-history` collection.
           $self_with_version_url = $self_url->setOption('query', [JsonApiSpec::VERSION_QUERY_PARAMETER => 'id:' . $entity->getRevisionId()]);
-          $links = $links->withLink('self', new Link(new CacheableMetadata(), $self_with_version_url, ['self']));
+          $links = $links->withLink('self', new Link(new CacheableMetadata(), $self_with_version_url, 'self'));
         }
         if (!$entity->isDefaultRevision()) {
           $latest_version_url = $self_url->setOption('query', [JsonApiSpec::VERSION_QUERY_PARAMETER => 'rel:' . VersionByRel::LATEST_VERSION]);
-          $links = $links->withLink(VersionByRel::LATEST_VERSION, new Link(new CacheableMetadata(), $latest_version_url, [VersionByRel::LATEST_VERSION]));
+          $links = $links->withLink(VersionByRel::LATEST_VERSION, new Link(new CacheableMetadata(), $latest_version_url, VersionByRel::LATEST_VERSION));
         }
         if (!$entity->isLatestRevision()) {
           $working_copy_url = $self_url->setOption('query', [JsonApiSpec::VERSION_QUERY_PARAMETER => 'rel:' . VersionByRel::WORKING_COPY]);
-          $links = $links->withLink(VersionByRel::WORKING_COPY, new Link(new CacheableMetadata(), $working_copy_url, [VersionByRel::WORKING_COPY]));
+          $links = $links->withLink(VersionByRel::WORKING_COPY, new Link(new CacheableMetadata(), $working_copy_url, VersionByRel::WORKING_COPY));
         }
       }
       if (!$links->hasLinkWithKey('self')) {
-        $links = $links->withLink('self', new Link(new CacheableMetadata(), $self_url, ['self']));
+        $links = $links->withLink('self', new Link(new CacheableMetadata(), $self_url, 'self'));
       }
     }
     return $links;
@@ -281,11 +308,15 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
       [$resource_type, 'isFieldEnabled']
     );
 
-    // The "label" field needs special treatment: some entity types have a label
-    // field that is actually backed by a label callback.
+    // Special handling for user entities that allows a JSON:API user agent to
+    // access the display name of a user. For example, this is useful when
+    // displaying the name of a node's author.
+    // @todo: eliminate this special casing in https://www.drupal.org/project/drupal/issues/3079254.
     $entity_type = $entity->getEntityType();
-    if ($entity_type->hasLabelCallback()) {
-      $fields[static::getLabelFieldName($entity)]->value = $entity->label();
+    if ($entity_type->id() == 'user' && $resource_type->isFieldEnabled('display_name')) {
+      assert($entity instanceof UserInterface);
+      $display_name = $resource_type->getPublicName('display_name');
+      $output[$display_name] = $entity->getDisplayName();
     }
 
     // Return a sub-array of $output containing the keys in $enabled_fields.
@@ -294,6 +325,7 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
       $public_field_name = $resource_type->getPublicName($field_name);
       $output[$public_field_name] = $field_value;
     }
+
     return $output;
   }
 
@@ -308,9 +340,13 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
    */
   protected static function getLabelFieldName(EntityInterface $entity) {
     $label_field_name = $entity->getEntityType()->getKey('label');
-    // @todo Remove this work-around after https://www.drupal.org/project/drupal/issues/2450793 lands.
+    // Special handling for user entities that allows a JSON:API user agent to
+    // access the display name of a user. This is useful when displaying the
+    // name of a node's author.
+    // @see \Drupal\jsonapi\JsonApiResource\ResourceObject::extractContentEntityFields()
+    // @todo: eliminate this special casing in https://www.drupal.org/project/drupal/issues/3079254.
     if ($entity->getEntityTypeId() === 'user') {
-      $label_field_name = 'name';
+      $label_field_name = 'display_name';
     }
     return $label_field_name;
   }
@@ -338,7 +374,7 @@ class ResourceObject implements CacheableDependencyInterface, ResourceIdentifier
     });
     // Return a sub-array of $output containing the keys in $enabled_fields.
     $input = array_intersect_key($fields, array_flip($enabled_field_names));
-    /* @var \Drupal\Core\Config\Entity\ConfigEntityInterface $entity */
+    /** @var \Drupal\Core\Config\Entity\ConfigEntityInterface $entity */
     foreach ($input as $field_name => $field_value) {
       $public_field_name = $resource_type->getPublicName($field_name);
       $enabled_public_fields[$public_field_name] = $field_value;

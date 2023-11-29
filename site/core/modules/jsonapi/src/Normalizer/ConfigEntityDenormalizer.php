@@ -11,15 +11,10 @@ use Drupal\jsonapi\ResourceType\ResourceType;
  * @internal JSON:API maintains no PHP API since its API is the HTTP API. This
  *   class may change at any time and this will break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  */
 final class ConfigEntityDenormalizer extends EntityDenormalizerBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $supportedInterfaceOrClass = ConfigEntityInterface::class;
 
   /**
    * {@inheritdoc}
@@ -30,6 +25,24 @@ final class ConfigEntityDenormalizer extends EntityDenormalizerBase {
       $prepared[$resource_type->getInternalName($key)] = $value;
     }
     return $prepared;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasCacheableSupportsMethod(): bool {
+    @trigger_error(__METHOD__ . '() is deprecated in drupal:10.1.0 and is removed from drupal:11.0.0. Use getSupportedTypes() instead. See https://www.drupal.org/node/3359695', E_USER_DEPRECATED);
+
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSupportedTypes(?string $format): array {
+    return [
+      ConfigEntityInterface::class => TRUE,
+    ];
   }
 
 }

@@ -107,7 +107,7 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
    * @param string $key
    *   The name of the entity key to return.
    *
-   * @return string|bool
+   * @return string|false
    *   The entity key, or FALSE if it does not exist.
    *
    * @see self::getKeys()
@@ -157,8 +157,9 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
    *
    * @param string $handler_type
    *   The type of handler to check.
-   * @param bool $nested
-   *   (optional) If this handler has a nested definition. Defaults to FALSE.
+   * @param string|false $nested
+   *   (optional) The nested handler definition key, or FALSE if the handler
+   *   does not have a nested definition. Defaults to FALSE.
    *
    * @return bool
    *   TRUE if a handler of this type exists, FALSE otherwise.
@@ -168,11 +169,14 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
   /**
    * @param string $handler_type
    *   The handler type to get.
+   * @param string|false $nested
+   *   (optional) The nested handler definition key, or FALSE if the handler
+   *   does not have a nested definition. Defaults to FALSE.
    *
    * @return array|string|null
    *   The handlers for a given type, or NULL if none exist.
    */
-  public function getHandlerClass($handler_type);
+  public function getHandlerClass($handler_type, $nested = FALSE);
 
   /**
    * Gets an array of handlers.
@@ -190,9 +194,9 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
    *     handler's constructor, so that one class can be used for multiple
    *     entity forms when the forms are similar. The classes must implement
    *     \Drupal\Core\Entity\EntityFormInterface.
-   *   - list: The name of the class that provides listings of the entities. The
+   *   - list_builder: The name of the class that provides listings of the entities. The
    *     class must implement \Drupal\Core\Entity\EntityListBuilderInterface.
-   *   - render: The name of the class that is used to render the entities. The
+   *   - view_builder: The name of the class that is used to render the entities. The
    *     class must implement \Drupal\Core\Entity\EntityViewBuilderInterface.
    *   - access: The name of the class that is used for access checks. The class
    *     must implement \Drupal\Core\Entity\EntityAccessControlHandlerInterface.
@@ -228,8 +232,9 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
    * @param string $operation
    *   The name of the operation to use, e.g., 'default'.
    *
-   * @return string
-   *   The class for this operation's form for this entity type.
+   * @return string|null
+   *   The class for this operation's form for this entity type or NULL if the
+   *   entity type does not have a form class for this operation.
    *
    * @see \Drupal\Core\Entity\EntityFormBuilderInterface
    */
@@ -356,21 +361,6 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
   public function entityClassImplements($interface);
 
   /**
-   * Indicates if the entity type is a subclass of the given class or interface.
-   *
-   * @param string $class
-   *   The class or interface to check.
-   *
-   * @return bool
-   *   TRUE if the entity type is a subclass of the class or interface.
-   *
-   * @deprecated in Drupal 8.3.0 and will be removed before Drupal 9.0.0.
-   *   Use Drupal\Core\Entity\EntityTypeInterface::entityClassImplements()
-   *   instead.
-   */
-  public function isSubclassOf($class);
-
-  /**
    * Sets the handlers for a given type.
    *
    * @param string $handler_type
@@ -412,11 +402,9 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
    * should be used for them. Where possible, link relationships should use
    * established IANA relationships rather than custom relationships.
    *
-   * Every entity type should, at minimum, define "canonical", which is the
-   * pattern for URIs to that entity. Even if the entity will have no HTML page
-   * exposed to users it should still have a canonical URI in order to be
-   * compatible with web services. Entities that will be user-editable via an
-   * HTML page must also define an "edit-form" relationship.
+   * Entities which can be viewed should define "canonical", which is the
+   * pattern for URIs to that entity including REST. Entities that will be
+   * user-editable via an HTML page should define an "edit-form" relationship.
    *
    * By default, the following placeholders are supported:
    * - [entityType]: The entity type itself will also be a valid token for the
@@ -471,65 +459,6 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
    *   Thrown when the path does not start with a leading slash.
    */
   public function setLinkTemplate($key, $path);
-
-  /**
-   * Gets the callback for the label of the entity.
-   *
-   * The function takes an entity and returns the label of the entity. Use
-   * language() on the entity to get information on the requested language. The
-   * entity label is the main string associated with an entity; for example, the
-   * title of a node or the subject of a comment. If there is an entity object
-   * property that defines the label, use the 'label' element of the
-   * 'entity_keys' return value component to provide this information. If more
-   * complex logic is needed to determine the label of an entity, you can
-   * instead specify a callback function here, which will be called to determine
-   * the entity label.
-   *
-   * @return callable|null
-   *   The callback, or NULL if none exists.
-   *
-   * @deprecated in Drupal 8.0.x-dev and will be removed before Drupal 9.0.0.
-   *   Use Drupal\Core\Entity\EntityInterface::label() for complex label
-   *   generation as needed.
-   *
-   * @see \Drupal\Core\Entity\EntityInterface::label()
-   * @see \Drupal\Core\Entity\EntityTypeInterface::setLabelCallback()
-   * @see \Drupal\Core\Entity\EntityTypeInterface::hasLabelCallback()
-   *
-   * @todo Remove usages of label_callback https://www.drupal.org/node/2450793.
-   */
-  public function getLabelCallback();
-
-  /**
-   * Sets the label callback.
-   *
-   * @param callable $callback
-   *   A callable that returns the label of the entity.
-   *
-   * @return $this
-   *
-   * @deprecated in Drupal 8.0.x-dev and will be removed before Drupal 9.0.0.
-   *   Use EntityInterface::label() for complex label generation as needed.
-   *
-   * @see \Drupal\Core\Entity\EntityInterface::label()
-   * @see \Drupal\Core\Entity\EntityTypeInterface::getLabelCallback()
-   * @see \Drupal\Core\Entity\EntityTypeInterface::hasLabelCallback()
-   */
-  public function setLabelCallback($callback);
-
-  /**
-   * Indicates if a label callback exists.
-   *
-   * @return bool
-   *
-   * @deprecated in Drupal 8.0.x-dev and will be removed before Drupal 9.0.0.
-   *   Use EntityInterface::label() for complex label generation as needed.
-   *
-   * @see \Drupal\Core\Entity\EntityInterface::label()
-   * @see \Drupal\Core\Entity\EntityTypeInterface::getLabelCallback()
-   * @see \Drupal\Core\Entity\EntityTypeInterface::setLabelCallback()
-   */
-  public function hasLabelCallback();
 
   /**
    * Gets the name of the entity type which provides bundles.
@@ -657,16 +586,6 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
   public function getLabel();
 
   /**
-   * Gets the lowercase form of the human-readable entity type name.
-   *
-   * @return string
-   *   The lowercase form of the human-readable entity type name.
-   *
-   * @see \Drupal\Core\Entity\EntityTypeInterface::getLabel()
-   */
-  public function getLowercaseLabel();
-
-  /**
    * Gets the uppercase plural form of the name of the entity type.
    *
    * This should return a human-readable version of the name that can refer
@@ -686,6 +605,9 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
    * the entity type. For example: "opportunity" (with the plural as
    * "opportunities"), "child" (with the plural as "children"), or "content
    * item" (with the plural as "content items").
+   *
+   * Think of it as an "in a full sentence, this is what we call this" label. As
+   * a consequence, the English version is lowercase.
    *
    * @return string|\Drupal\Core\StringTranslation\TranslatableMarkup
    *   The singular label.
@@ -745,6 +667,14 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
   /**
    * Gets the machine name of the entity type group.
    *
+   * The entity type group is an annotation property of the entity type.
+   *
+   * Drupal core defines two entity type groups:
+   *  - content: Entities which form the information on a site. Content entities
+   *    are typically customized with fields.
+   *  - config: Entities which define structural elements of a site, which are
+   *    managed as part of the site's configuration.
+   *
    * @return string
    */
   public function getGroup();
@@ -754,6 +684,8 @@ interface EntityTypeInterface extends PluginDefinitionInterface {
    *
    * @return string|\Drupal\Core\StringTranslation\TranslatableMarkup
    *   The group label.
+   *
+   * @see self::getGroup()
    */
   public function getGroupLabel();
 

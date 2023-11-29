@@ -2,15 +2,14 @@
 
 namespace Drupal\field_ui;
 
+use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
-use Drupal\Core\DependencyInjection\DeprecatedServicePropertyTrait;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\FieldTypePluginManagerInterface;
-use Drupal\Core\Url;
 use Drupal\field\FieldConfigInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -18,14 +17,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Provides lists of field config entities.
  */
 class FieldConfigListBuilder extends ConfigEntityListBuilder {
-  use DeprecatedServicePropertyTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $deprecatedProperties = [
-    'entityManager' => 'entity.manager',
-  ];
 
   /**
    * The name of the entity type the listed fields are attached to.
@@ -74,15 +65,11 @@ class FieldConfigListBuilder extends ConfigEntityListBuilder {
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface|null $entity_field_manager
    *   The entity field manager.
    */
-  public function __construct(EntityTypeInterface $entity_type, EntityTypeManagerInterface $entity_type_manager, FieldTypePluginManagerInterface $field_type_manager, EntityFieldManagerInterface $entity_field_manager = NULL) {
+  public function __construct(EntityTypeInterface $entity_type, EntityTypeManagerInterface $entity_type_manager, FieldTypePluginManagerInterface $field_type_manager, EntityFieldManagerInterface $entity_field_manager) {
     parent::__construct($entity_type, $entity_type_manager->getStorage($entity_type->id()));
 
     $this->entityTypeManager = $entity_type_manager;
     $this->fieldTypeManager = $field_type_manager;
-    if (!$entity_field_manager) {
-      @trigger_error('Calling FieldConfigListBuilder::__construct() with the $entity_field_manager argument is supported in Drupal 8.7.0 and will be required before Drupal 9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_field_manager = \Drupal::service('entity_field.manager');
-    }
     $this->entityFieldManager = $entity_field_manager;
   }
 
@@ -108,6 +95,7 @@ class FieldConfigListBuilder extends ConfigEntityListBuilder {
     $build = parent::render();
     $build['table']['#attributes']['id'] = 'field-overview';
     $build['table']['#empty'] = $this->t('No fields are present yet.');
+    $build['#attached']['library'][] = 'field_ui/drupal.field_ui';
 
     return $build;
   }
@@ -136,7 +124,7 @@ class FieldConfigListBuilder extends ConfigEntityListBuilder {
         'data' => $this->t('Machine name'),
         'class' => [RESPONSIVE_PRIORITY_MEDIUM],
       ],
-      'field_type' => $this->t('Field type'),
+      'settings_summary' => $this->t('Field type'),
     ];
     return $header + parent::buildHeader();
   }
@@ -147,23 +135,28 @@ class FieldConfigListBuilder extends ConfigEntityListBuilder {
   public function buildRow(EntityInterface $field_config) {
     /** @var \Drupal\field\FieldConfigInterface $field_config */
     $field_storage = $field_config->getFieldStorageDefinition();
-    $route_parameters = [
-      'field_config' => $field_config->id(),
-    ] + FieldUI::getRouteBundleParameter($this->entityTypeManager->getDefinition($this->targetEntityTypeId), $this->targetBundle);
+
+    $storage_summary = $this->fieldTypeManager->getStorageSettingsSummary($field_storage);
+    $instance_summary = $this->fieldTypeManager->getFieldSettingsSummary($field_config);
+    $summary_list = [...$storage_summary, ...$instance_summary];
+
+    $settings_summary = [
+      'data' => [
+        '#theme' => 'item_list',
+        '#items' => [
+          $this->fieldTypeManager->getDefinitions()[$field_storage->getType()]['label'],
+          ...$summary_list,
+        ],
+      ],
+      'class' => ['field-settings-summary-cell'],
+    ];
 
     $row = [
       'id' => Html::getClass($field_config->getName()),
       'data' => [
         'label' => $field_config->getLabel(),
         'field_name' => $field_config->getName(),
-        'field_type' => [
-          'data' => [
-            '#type' => 'link',
-            '#title' => $this->fieldTypeManager->getDefinitions()[$field_storage->getType()]['label'],
-            '#url' => Url::fromRoute("entity.field_config.{$this->targetEntityTypeId}_storage_edit_form", $route_parameters),
-            '#options' => ['attributes' => ['title' => $this->t('Edit field settings.')]],
-          ],
-        ],
+        'settings_summary' => $settings_summary,
       ],
     ];
 
@@ -202,6 +195,11 @@ class FieldConfigListBuilder extends ConfigEntityListBuilder {
         'url' => $entity->toUrl("{$entity->getTargetEntityTypeId()}-field-delete-form"),
         'attributes' => [
           'title' => $this->t('Delete field.'),
+          'class' => ['use-ajax'],
+          'data-dialog-type' => 'modal',
+          'data-dialog-options' => Json::encode([
+            'width' => 880,
+          ]),
         ],
       ];
     }

@@ -9,6 +9,7 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Link;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -40,12 +41,8 @@ class ContentTranslationController extends ControllerBase {
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entity_field_manager
    *   The entity field manager service.
    */
-  public function __construct(ContentTranslationManagerInterface $manager, EntityFieldManagerInterface $entity_field_manager = NULL) {
+  public function __construct(ContentTranslationManagerInterface $manager, EntityFieldManagerInterface $entity_field_manager) {
     $this->manager = $manager;
-    if (!$entity_field_manager) {
-      @trigger_error('The entity_field.manager service must be passed to ContentTranslationController::__construct(), it is required before Drupal 9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_field_manager = \Drupal::service('entity_field.manager');
-    }
     $this->entityFieldManager = $entity_field_manager;
   }
 
@@ -70,8 +67,36 @@ class ContentTranslationController extends ControllerBase {
    *   The language to be used as target.
    */
   public function prepareTranslation(ContentEntityInterface $entity, LanguageInterface $source, LanguageInterface $target) {
-    /* @var \Drupal\Core\Entity\ContentEntityInterface $source_translation */
-    $source_translation = $entity->getTranslation($source->getId());
+    $source_langcode = $source->getId();
+    /** @var \Drupal\Core\Entity\ContentEntityStorageInterface $storage */
+    $storage = $this->entityTypeManager()->getStorage($entity->getEntityTypeId());
+
+    // Once translations from the default revision are added, there may be
+    // additional draft translations that don't exist in the default revision.
+    // Add those translations too so that they aren't deleted when the new
+    // translation is saved.
+    /** @var \Drupal\Core\Entity\ContentEntityInterface $default_revision */
+    $default_revision = $storage->load($entity->id());
+    // Check the entity isn't missing any translations.
+    $languages = $this->languageManager()->getLanguages();
+    foreach ($languages as $language) {
+      $langcode = $language->getId();
+      if ($entity->hasTranslation($langcode) || $target->getId() === $langcode) {
+        continue;
+      }
+      $latest_revision_id = $storage->getLatestTranslationAffectedRevisionId($entity->id(), $langcode);
+      if ($latest_revision_id) {
+        if ($default_revision->hasTranslation($langcode)) {
+          $existing_translation = $default_revision->getTranslation($langcode);
+          $existing_translation->setNewRevision(FALSE);
+          $existing_translation->isDefaultRevision(FALSE);
+          $existing_translation->setRevisionTranslationAffected(FALSE);
+          $entity->addTranslation($langcode, $existing_translation->toArray());
+        }
+      }
+    }
+    /** @var \Drupal\Core\Entity\ContentEntityInterface $source_translation */
+    $source_translation = $entity->getTranslation($source_langcode);
     $target_translation = $entity->addTranslation($target->getId(), $source_translation->toArray());
 
     // Make sure we do not inherit the affected status from the source values.
@@ -87,6 +112,7 @@ class ContentTranslationController extends ControllerBase {
     // creation time.
     $metadata->setAuthor($user);
     $metadata->setCreatedTime(REQUEST_TIME);
+    $metadata->setSource($source_langcode);
   }
 
   /**
@@ -96,6 +122,7 @@ class ContentTranslationController extends ControllerBase {
    *   The route match.
    * @param string $entity_type_id
    *   (optional) The entity type ID.
+   *
    * @return array
    *   Array of page elements to render.
    */
@@ -185,11 +212,11 @@ class ContentTranslationController extends ControllerBase {
           $metadata = $manager->getTranslationMetadata($translation);
           $source = $metadata->getSource() ?: LanguageInterface::LANGCODE_NOT_SPECIFIED;
           $is_original = $langcode == $original;
-          $label = $entity->getTranslation($langcode)->label();
-          $link = isset($links->links[$langcode]['url']) ? $links->links[$langcode] : ['url' => $entity->toUrl()];
+          $label = $entity->getTranslation($langcode)->label() ?? $entity->id();
+          $link = ['url' => $entity->toUrl()];
           if (!empty($link['url'])) {
             $link['url']->setOption('language', $language);
-            $row_title = $this->l($label, $link['url']);
+            $row_title = Link::fromTextAndUrl($label, $link['url'])->toString();
           }
 
           if (empty($link['url'])) {
@@ -323,7 +350,7 @@ class ContentTranslationController extends ControllerBase {
       ];
     }
 
-    $build['#title'] = $this->t('Translations of %label', ['%label' => $entity->label()]);
+    $build['#title'] = $this->t('Translations of %label', ['%label' => $entity->label() ?? $entity->id()]);
 
     // Add metadata to the build render array to let other modules know about
     // which entity this is.

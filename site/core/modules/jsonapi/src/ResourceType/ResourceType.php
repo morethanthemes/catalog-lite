@@ -11,12 +11,19 @@ namespace Drupal\jsonapi\ResourceType;
  * @internal JSON:API maintains no PHP API since its API is the HTTP API. This
  *   class may change at any time and this will break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  *
  * @see \Drupal\jsonapi\ResourceType\ResourceTypeRepository
  */
 class ResourceType {
+
+  /**
+   * A string which is used as path separator in resource type names.
+   *
+   * @see \Drupal\jsonapi\ResourceType\ResourceType::getPath()
+   */
+  const TYPE_NAME_URI_PATH_SEPARATOR = '--';
 
   /**
    * The entity type ID.
@@ -82,27 +89,18 @@ class ResourceType {
   protected $fields;
 
   /**
-   * The list of disabled fields. Disabled by default: uuid, id, type.
+   * An array of arrays of relatable resource types, keyed by public field name.
    *
-   * @var string[]
-   *
-   * @see \Drupal\jsonapi\ResourceType\ResourceTypeRepository::getFieldMapping()
+   * @var array
    */
-  protected $disabledFields;
+  protected $relatableResourceTypesByField;
 
   /**
-   * The mapping for field aliases: keys=internal names, values=public names.
+   * The mapping for field aliases: keys=public names, values=internal names.
    *
    * @var string[]
    */
   protected $fieldMapping;
-
-  /**
-   * The inverse of $fieldMapping.
-   *
-   * @var string[]
-   */
-  protected $invertedFieldMapping;
 
   /**
    * Gets the entity type ID.
@@ -160,8 +158,8 @@ class ResourceType {
    */
   public function getPublicName($field_name) {
     // By default the entity field name is the public field name.
-    return isset($this->fieldMapping[$field_name])
-      ? $this->fieldMapping[$field_name]
+    return isset($this->fields[$field_name])
+      ? $this->fields[$field_name]->getPublicName()
       : $field_name;
   }
 
@@ -176,9 +174,47 @@ class ResourceType {
    */
   public function getInternalName($field_name) {
     // By default the entity field name is the public field name.
-    return isset($this->invertedFieldMapping[$field_name])
-      ? $this->invertedFieldMapping[$field_name]
-      : $field_name;
+    return $this->fieldMapping[$field_name] ?? $field_name;
+  }
+
+  /**
+   * Gets the attribute and relationship fields of this resource type.
+   *
+   * @return \Drupal\jsonapi\ResourceType\ResourceTypeField[]
+   *   The field objects on this resource type.
+   */
+  public function getFields() {
+    return $this->fields;
+  }
+
+  /**
+   * Gets a particular attribute or relationship field by public field name.
+   *
+   * @param string $public_field_name
+   *   The public field name of the desired field.
+   *
+   * @return \Drupal\jsonapi\ResourceType\ResourceTypeField|null
+   *   A resource type field object or NULL if the field does not exist on this
+   *   resource type.
+   */
+  public function getFieldByPublicName($public_field_name) {
+    return isset($this->fieldMapping[$public_field_name])
+      ? $this->getFieldByInternalName($this->fieldMapping[$public_field_name])
+      : NULL;
+  }
+
+  /**
+   * Gets a particular attribute or relationship field by internal field name.
+   *
+   * @param string $internal_field_name
+   *   The internal field name of the desired field.
+   *
+   * @return \Drupal\jsonapi\ResourceType\ResourceTypeField|null
+   *   A resource type field object or NULL if the field does not exist on this
+   *   resource type.
+   */
+  public function getFieldByInternalName($internal_field_name) {
+    return $this->fields[$internal_field_name] ?? NULL;
   }
 
   /**
@@ -199,7 +235,7 @@ class ResourceType {
    *   otherwise.
    */
   public function hasField($field_name) {
-    return in_array($field_name, $this->fields, TRUE);
+    return array_key_exists($field_name, $this->fields);
   }
 
   /**
@@ -216,7 +252,7 @@ class ResourceType {
    *   of the data model. FALSE otherwise.
    */
   public function isFieldEnabled($field_name) {
-    return $this->hasField($field_name) && !in_array($field_name, $this->disabledFields, TRUE);
+    return $this->hasField($field_name) && $this->fields[$field_name]->isFieldEnabled();
   }
 
   /**
@@ -246,7 +282,7 @@ class ResourceType {
    * the HTTP API. For example, read-only data from an internal resource might
    * be embedded in a public resource using computed fields. Therefore,
    * including the internal resource as a relationship with distinct routes
-   * might uneccesarilly expose internal implementation details.
+   * might unnecessarily expose internal implementation details.
    *
    * @return bool
    *   TRUE if the resource type is internal. FALSE otherwise.
@@ -307,10 +343,12 @@ class ResourceType {
    *   (optional) Whether the resource type is mutable.
    * @param bool $is_versionable
    *   (optional) Whether the resource type is versionable.
-   * @param array $field_mapping
-   *   (optional) The field mapping to use.
+   * @param \Drupal\jsonapi\ResourceType\ResourceTypeField[] $fields
+   *   (optional) The resource type fields, keyed by internal field name.
+   * @param null|string $type_name
+   *   The resource type name.
    */
-  public function __construct($entity_type_id, $bundle, $deserialization_target_class, $internal = FALSE, $is_locatable = TRUE, $is_mutable = TRUE, $is_versionable = FALSE, array $field_mapping = []) {
+  public function __construct($entity_type_id, $bundle, $deserialization_target_class, $internal = FALSE, $is_locatable = TRUE, $is_mutable = TRUE, $is_versionable = FALSE, array $fields = [], $type_name = NULL) {
     $this->entityTypeId = $entity_type_id;
     $this->bundle = $bundle;
     $this->deserializationTargetClass = $deserialization_target_class;
@@ -318,17 +356,18 @@ class ResourceType {
     $this->isLocatable = $is_locatable;
     $this->isMutable = $is_mutable;
     $this->isVersionable = $is_versionable;
+    $this->fields = $fields;
 
-    $this->typeName = $this->bundle === '?'
-      ? 'unknown'
-      : sprintf('%s--%s', $this->entityTypeId, $this->bundle);
+    $this->typeName = $type_name;
+    if ($type_name === NULL) {
+      $this->typeName = $this->bundle === '?'
+        ? 'unknown'
+        : $this->entityTypeId . self::TYPE_NAME_URI_PATH_SEPARATOR . $this->bundle;
+    }
 
-    $this->fields = array_keys($field_mapping);
-    $this->disabledFields = array_keys(array_filter($field_mapping, function ($v) {
-      return $v === FALSE;
-    }));
-    $this->fieldMapping = array_filter($field_mapping, 'is_string');
-    $this->invertedFieldMapping = array_flip($this->fieldMapping);
+    $this->fieldMapping = array_flip(array_map(function (ResourceTypeField $field) {
+      return $field->getPublicName();
+    }, $this->fields));
   }
 
   /**
@@ -341,7 +380,16 @@ class ResourceType {
    *   across resource types across fields, but not within a field.
    */
   public function setRelatableResourceTypes(array $relatable_resource_types) {
-    $this->relatableResourceTypes = $relatable_resource_types;
+    $this->fields = array_reduce(array_keys($relatable_resource_types), function ($fields, $public_field_name) use ($relatable_resource_types) {
+      if (!isset($this->fieldMapping[$public_field_name])) {
+        throw new \LogicException('A field must exist for relatable resource types to be set on it.');
+      }
+      $internal_field_name = $this->fieldMapping[$public_field_name];
+      $field = $fields[$internal_field_name];
+      assert($field instanceof ResourceTypeRelationship);
+      $fields[$internal_field_name] = $field->withRelatableResourceTypes($relatable_resource_types[$public_field_name]);
+      return $fields;
+    }, $this->fields);
   }
 
   /**
@@ -353,10 +401,14 @@ class ResourceType {
    * @see self::setRelatableResourceTypes()
    */
   public function getRelatableResourceTypes() {
-    if (!isset($this->relatableResourceTypes)) {
-      throw new \LogicException("setRelatableResourceTypes() must be called before getting relatable resource types.");
+    if (!isset($this->relatableResourceTypesByField)) {
+      $this->relatableResourceTypesByField = array_reduce(array_map(function (ResourceTypeRelationship $field) {
+        return [$field->getPublicName() => $field->getRelatableResourceTypes()];
+      }, array_filter($this->fields, function (ResourceTypeField $field) {
+        return $field instanceof ResourceTypeRelationship && $field->isFieldEnabled();
+      })), 'array_merge', []);
     }
-    return $this->relatableResourceTypes;
+    return $this->relatableResourceTypesByField;
   }
 
   /**
@@ -371,22 +423,24 @@ class ResourceType {
    * @see self::getRelatableResourceTypes()
    */
   public function getRelatableResourceTypesByField($field_name) {
-    $relatable_resource_types = $this->getRelatableResourceTypes();
-    return isset($relatable_resource_types[$field_name]) ?
-      $relatable_resource_types[$field_name] :
-      [];
+    return ($field = $this->getFieldByPublicName($field_name)) && $field instanceof ResourceTypeRelationship && $field->isFieldEnabled()
+      ? $field->getRelatableResourceTypes()
+      : [];
   }
 
   /**
    * Get the resource path.
    *
    * @return string
-   *   The path to access this resource type. Default: /entity_type_id/bundle.
+   *   The path to access this resource type. The function
+   *   replaces "--" with "/" in the URI path.
+   *   Example: "node--article" -> "node/article".
    *
+   * @see \Drupal\jsonapi\ResourceType\ResourceType::TYPE_NAME_URI_PATH_SEPARATOR
    * @see jsonapi.base_path
    */
   public function getPath() {
-    return sprintf('/%s/%s', $this->getEntityTypeId(), $this->getBundle());
+    return '/' . implode('/', explode(self::TYPE_NAME_URI_PATH_SEPARATOR, $this->typeName));
   }
 
 }

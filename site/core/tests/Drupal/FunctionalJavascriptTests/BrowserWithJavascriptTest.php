@@ -2,7 +2,7 @@
 
 namespace Drupal\FunctionalJavascriptTests;
 
-use Behat\Mink\Driver\GoutteDriver;
+use PHPUnit\Framework\AssertionFailedError;
 
 /**
  * Tests if we can execute JavaScript in the browser.
@@ -16,7 +16,12 @@ class BrowserWithJavascriptTest extends WebDriverTestBase {
    *
    * @var array
    */
-  public static $modules = ['test_page_test'];
+  protected static $modules = ['test_page_test'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   public function testJavascript() {
     $this->drupalGet('<front>');
@@ -32,9 +37,13 @@ class BrowserWithJavascriptTest extends WebDriverTestBase {
         x = w.innerWidth || e.clientWidth || g.clientWidth,
         y = w.innerHeight || e.clientHeight|| g.clientHeight;
         return x == 400 && y == 300;
-    }());
+    }())
 JS;
     $this->assertJsCondition($javascript);
+
+    // Ensure that \Drupal\Tests\UiHelperTrait::isTestUsingGuzzleClient() works
+    // as expected.
+    $this->assertFalse($this->isTestUsingGuzzleClient());
   }
 
   public function testAssertJsCondition() {
@@ -51,12 +60,12 @@ JS;
         x = w.innerWidth || e.clientWidth || g.clientWidth,
         y = w.innerHeight || e.clientHeight|| g.clientHeight;
         return x == 400 && y == 300;
-    }());
+    }())
 JS;
 
     // We expected the following assertion to fail because the window has been
     // re-sized to have a width of 500 not 400.
-    $this->setExpectedException(\PHPUnit_Framework_AssertionFailedError::class);
+    $this->expectException(AssertionFailedError::class);
     $this->assertJsCondition($javascript, 100);
   }
 
@@ -101,7 +110,7 @@ JS;
    * @param string|\Drupal\Core\Url $path
    *   Drupal path or URL to load into Mink controlled browser.
    * @param array $options
-   *   (optional) Options to be forwarded to the url generator.
+   *   (optional) Options to be forwarded to the URL generator.
    * @param string[] $headers
    *   An array containing additional HTTP request headers, the array keys are
    *   the header names and the array values the header values. This is useful
@@ -145,9 +154,9 @@ JS;
       $this->metaRefreshCount = 0;
     }
 
-    // Log only for JavascriptTestBase tests because for Goutte we log with
-    // ::getResponseLogHandler.
-    if ($this->htmlOutputEnabled && !($this->getSession()->getDriver() instanceof GoutteDriver)) {
+    // Log only for WebDriverTestBase tests because for DrupalTestBrowser we log
+    // with ::getResponseLogHandler.
+    if ($this->htmlOutputEnabled && !$this->isTestUsingGuzzleClient()) {
       $html_output = 'GET request to: ' . $url .
         '<hr />Ending URL: ' . $this->getSession()->getCurrentUrl();
       $html_output .= '<hr />' . $out;

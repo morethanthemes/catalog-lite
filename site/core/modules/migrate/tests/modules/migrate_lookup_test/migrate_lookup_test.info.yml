@@ -1,0 +1,12 @@
+name: 'Migration Lookup Test'
+type: module
+description: 'Provides test migrations to test migration lookup service.'
+package: Testing
+# version: VERSION
+dependencies:
+  - drupal:migrate
+
+# Information added by Drupal.org packaging script on 2023-11-01
+version: '10.1.6'
+project: 'drupal'
+datestamp: 1698841355

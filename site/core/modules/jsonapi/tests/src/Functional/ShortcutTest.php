@@ -23,7 +23,12 @@ class ShortcutTest extends ResourceTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['comment', 'shortcut'];
+  protected static $modules = ['comment', 'shortcut'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -60,7 +65,7 @@ class ShortcutTest extends ResourceTestBase {
   protected function createEntity() {
     $shortcut = Shortcut::create([
       'shortcut_set' => 'default',
-      'title' => t('Comments'),
+      'title' => 'Comments',
       'weight' => -20,
       'link' => [
         'uri' => 'internal:/user/logout',
@@ -110,6 +115,9 @@ class ShortcutTest extends ResourceTestBase {
           'shortcut_set' => [
             'data' => [
               'type' => 'shortcut_set--shortcut_set',
+              'meta' => [
+                'drupal_internal__target_id' => 'default',
+              ],
               'id' => ShortcutSet::load('default')->uuid(),
             ],
             'links' => [
@@ -144,27 +152,6 @@ class ShortcutTest extends ResourceTestBase {
    */
   protected function getExpectedUnauthorizedAccessMessage($method) {
     return "The shortcut set must be the currently displayed set for the user and the user must have 'access shortcuts' AND 'customize shortcut links' permissions.";
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function testPostIndividual() {
-    $this->markTestSkipped('Disabled until https://www.drupal.org/project/drupal/issues/2982060 is fixed.');
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function testRelationships() {
-    $this->markTestSkipped('Disabled until https://www.drupal.org/project/drupal/issues/2982060 is fixed.');
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function testPatchIndividual() {
-    $this->markTestSkipped('Disabled until https://www.drupal.org/project/drupal/issues/2982060 is fixed.');
   }
 
   /**

@@ -3,7 +3,6 @@
 namespace Drupal\Core\Entity;
 
 use Drupal\Core\Access\AccessResult;
-use Drupal\Core\DependencyInjection\DeprecatedServicePropertyTrait;
 use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
@@ -13,12 +12,6 @@ use Symfony\Component\Routing\Route;
  * Defines an access checker for entity creation.
  */
 class EntityCreateAccessCheck implements AccessInterface {
-  use DeprecatedServicePropertyTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $deprecatedProperties = ['entityManager' => 'entity.manager'];
 
   /**
    * The entity type manager service.
@@ -35,19 +28,12 @@ class EntityCreateAccessCheck implements AccessInterface {
   protected $requirementsKey = '_entity_create_access';
 
   /**
-   * Constructs a EntityCreateAccessCheck object.
+   * Constructs an EntityCreateAccessCheck object.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   The entity type manager service.
    */
   public function __construct(EntityTypeManagerInterface $entity_type_manager) {
-    if ($entity_type_manager instanceof EntityManagerInterface) {
-      @trigger_error('Passing the entity.manager service to EntityCreateAccessCheck::__construct() is deprecated in Drupal 8.7.0 and will be removed before Drupal 9.0.0. Pass the new dependencies instead. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $this->entityTypeManager = \Drupal::entityTypeManager();
-    }
-    else {
-      $this->entityTypeManager = $entity_type_manager;
-    }
     $this->entityTypeManager = $entity_type_manager;
   }
 
@@ -65,17 +51,17 @@ class EntityCreateAccessCheck implements AccessInterface {
    *   The access result.
    */
   public function access(Route $route, RouteMatchInterface $route_match, AccountInterface $account) {
-    list($entity_type, $bundle) = explode(':', $route->getRequirement($this->requirementsKey) . ':');
+    [$entity_type, $bundle] = explode(':', $route->getRequirement($this->requirementsKey) . ':');
 
     // The bundle argument can contain request argument placeholders like
     // {name}, loop over the raw variables and attempt to replace them in the
     // bundle name. If a placeholder does not exist, it won't get replaced.
-    if ($bundle && strpos($bundle, '{') !== FALSE) {
+    if ($bundle && str_contains($bundle, '{')) {
       foreach ($route_match->getRawParameters()->all() as $name => $value) {
         $bundle = str_replace('{' . $name . '}', $value, $bundle);
       }
       // If we were unable to replace all placeholders, deny access.
-      if (strpos($bundle, '{') !== FALSE) {
+      if (str_contains($bundle, '{')) {
         return AccessResult::neutral(sprintf("Could not find '%s' request argument, therefore cannot check create access.", $bundle));
       }
     }

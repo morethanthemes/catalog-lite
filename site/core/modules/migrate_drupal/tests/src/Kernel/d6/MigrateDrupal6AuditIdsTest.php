@@ -24,7 +24,7 @@ class MigrateDrupal6AuditIdsTest extends MigrateDrupal6TestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     // Enable all modules.
     self::$modules = array_keys($this->coreModuleListDataProvider());
     parent::setUp();
@@ -35,10 +35,12 @@ class MigrateDrupal6AuditIdsTest extends MigrateDrupal6TestBase {
     // Install required schemas.
     $this->installSchema('book', ['book']);
     $this->installSchema('dblog', ['watchdog']);
+    // @todo Remove forum in https://www.drupal.org/project/drupal/issues/3261653
     $this->installSchema('forum', ['forum_index']);
     $this->installSchema('node', ['node_access']);
     $this->installSchema('search', ['search_dataset']);
     $this->installSchema('system', ['sequences']);
+    // @todo Remove tracker in https://www.drupal.org/project/drupal/issues/3261452
     $this->installSchema('tracker', ['tracker_node', 'tracker_user']);
 
     // Enable content moderation for nodes of type page.
@@ -128,13 +130,12 @@ class MigrateDrupal6AuditIdsTest extends MigrateDrupal6TestBase {
     );
 
     $expected = [
-      'd6_aggregator_feed',
-      'd6_aggregator_item',
       'd6_comment',
       'd6_custom_block',
       'd6_file',
       'd6_menu_links',
       'd6_node',
+      'd6_node_complete',
       'd6_node_revision',
       'd6_taxonomy_term',
       'd6_term_node_revision',

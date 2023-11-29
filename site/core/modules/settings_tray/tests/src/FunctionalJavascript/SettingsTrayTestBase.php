@@ -16,7 +16,7 @@ class SettingsTrayTestBase extends OffCanvasTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = [
+  protected static $modules = [
     'settings_tray',
     // Add test module to override CSS pointer-events properties because they
     // cause test failures.
@@ -81,7 +81,6 @@ class SettingsTrayTestBase extends OffCanvasTestBase {
     $edit_button = $this->getSession()
       ->getPage()
       ->find('css', static::TOOLBAR_EDIT_LINK_SELECTOR);
-    $this->getSession()->executeScript("jQuery('[data-quickedit-entity-id]').trigger('mouseleave')");
     $edit_button->mouseOver();
     $edit_button->press();
   }
@@ -92,7 +91,6 @@ class SettingsTrayTestBase extends OffCanvasTestBase {
   protected function assertEditModeDisabled() {
     $web_assert = $this->assertSession();
     $page = $this->getSession()->getPage();
-    $this->getSession()->executeScript("jQuery('[data-quickedit-entity-id]').trigger('mouseleave')");
     $page->find('css', static::TOOLBAR_EDIT_LINK_SELECTOR)->mouseOver();
     $this->assertTrue($page->waitFor(10, function ($page) {
       return !$page->find('css', '.contextual .trigger:not(.visually-hidden)');
@@ -137,11 +135,11 @@ class SettingsTrayTestBase extends OffCanvasTestBase {
     $web_assert->elementTextContains('css', '.form-item-settings-label-display label', 'Display block title');
     // Confirm Block title label is shown if checkbox is checked.
     if ($this->getSession()->getPage()->find('css', 'input[name="settings[label_display]"]')->isChecked()) {
-      $this->assertEquals($this->isLabelInputVisible(), TRUE, 'Label is visible');
+      $this->assertTrue($this->isLabelInputVisible(), 'Label is visible');
       $web_assert->elementTextContains('css', '.form-item-settings-label label', 'Block title');
     }
     else {
-      $this->assertEquals($this->isLabelInputVisible(), FALSE, 'Label is not visible');
+      $this->assertFalse($this->isLabelInputVisible(), 'Label is not visible');
     }
 
     // Check that common block form elements exist.
@@ -156,10 +154,10 @@ class SettingsTrayTestBase extends OffCanvasTestBase {
    * {@inheritdoc}
    */
   protected function getTestThemes() {
-    // Remove 'seven' theme. Settings Tray "Edit Mode" will not work with
-    // 'seven' because it removes all contextual links.
+    // Remove 'claro' theme. Settings Tray "Edit Mode" will not work with this
+    // theme because it removes all contextual links.
     return array_filter(parent::getTestThemes(), function ($theme) {
-      return $theme !== 'seven';
+      return ($theme !== 'claro');
     });
   }
 

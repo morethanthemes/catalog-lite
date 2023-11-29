@@ -7,6 +7,7 @@ use Drupal\KernelTests\KernelTestBase;
 use Drupal\media_library\Form\FileUploadForm;
 use Drupal\media_library\Form\OEmbedForm;
 use Drupal\media_library\MediaLibraryState;
+use Drupal\media_library_form_overwrite_test\Form\TestAddForm;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 
@@ -37,13 +38,13 @@ class MediaLibraryAddFormTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->installEntitySchema('user');
     $this->installEntitySchema('file');
     $this->installSchema('file', 'file_usage');
-    $this->installSchema('system', ['sequences', 'key_value_expire']);
+    $this->installSchema('system', ['sequences']);
     $this->installEntitySchema('media');
     $this->installConfig([
       'field',
@@ -120,7 +121,8 @@ class MediaLibraryAddFormTest extends KernelTestBase {
    */
   public function testFormStateValidation() {
     $form_state = new FormState();
-    $this->setExpectedException(\InvalidArgumentException::class, 'The media library state is not present in the form state.');
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage('The media library state is not present in the form state.');
     \Drupal::formBuilder()->buildForm(FileUploadForm::class, $form_state);
   }
 
@@ -131,8 +133,24 @@ class MediaLibraryAddFormTest extends KernelTestBase {
     $state = MediaLibraryState::create('test', ['image', 'remote_video', 'header_image'], 'header_image', -1);
     $form_state = new FormState();
     $form_state->set('media_library_state', $state);
-    $this->setExpectedException(\InvalidArgumentException::class, "The 'header_image' media type does not exist.");
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage("The 'header_image' media type does not exist.");
     \Drupal::formBuilder()->buildForm(FileUploadForm::class, $form_state);
+  }
+
+  /**
+   * Tests overwriting of the add form.
+   */
+  public function testDifferentAddForm() {
+    $this->enableModules(['media_library_form_overwrite_test']);
+
+    $entity_type_manager = \Drupal::entityTypeManager();
+    $image = $entity_type_manager->getStorage('media_type')->load('image');
+
+    $image_source_definition = $image->getSource()->getPluginDefinition();
+
+    // Assert the overwritten form class is set to the media source.
+    $this->assertSame(TestAddForm::class, $image_source_definition['forms']['media_library_add']);
   }
 
 }

@@ -2,10 +2,12 @@
 
 namespace Drupal\Tests\views\Functional\Handler;
 
+use Drupal\Component\Render\FormattableMarkup;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Url;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 use Drupal\Tests\views\Functional\ViewTestBase;
 use Drupal\views\Views;
@@ -25,12 +27,17 @@ class FieldWebTest extends ViewTestBase {
    *
    * @var array
    */
-  public static $testViews = ['test_view', 'test_field_classes', 'test_field_output', 'test_click_sort'];
+  public static $testViews = ['test_view', 'test_field_classes', 'test_field_output', 'test_click_sort', 'test_distinct_click_sorting'];
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['node'];
+  protected static $modules = ['node', 'language'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * Maps between the key in the expected result and the query result.
@@ -41,8 +48,11 @@ class FieldWebTest extends ViewTestBase {
     'views_test_data_name' => 'name',
   ];
 
-  protected function setUp($import_test_views = TRUE) {
-    parent::setUp($import_test_views);
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp($import_test_views = TRUE, $modules = ['views_test_config']): void {
+    parent::setUp($import_test_views, $modules);
 
     $this->enableViewsTestModule();
   }
@@ -61,12 +71,12 @@ class FieldWebTest extends ViewTestBase {
    */
   public function testClickSorting() {
     $this->drupalGet('test_click_sort');
-    $this->assertResponse(200);
+    $this->assertSession()->statusCodeEquals(200);
 
     // Only the id and name should be click sortable, but not the name.
-    $this->assertLinkByHref(Url::fromRoute('<none>', [], ['query' => ['order' => 'id', 'sort' => 'asc']])->toString());
-    $this->assertLinkByHref(Url::fromRoute('<none>', [], ['query' => ['order' => 'name', 'sort' => 'desc']])->toString());
-    $this->assertNoLinkByHref(Url::fromRoute('<none>', [], ['query' => ['order' => 'created']])->toString());
+    $this->assertSession()->linkByHrefExists(Url::fromRoute('<none>', [], ['query' => ['order' => 'id', 'sort' => 'asc']])->toString());
+    $this->assertSession()->linkByHrefExists(Url::fromRoute('<none>', [], ['query' => ['order' => 'name', 'sort' => 'desc']])->toString());
+    $this->assertSession()->linkByHrefNotExists(Url::fromRoute('<none>', [], ['query' => ['order' => 'created']])->toString());
 
     // Check that the view returns the click sorting cache contexts.
     $expected_contexts = [
@@ -77,16 +87,37 @@ class FieldWebTest extends ViewTestBase {
     $this->assertCacheContexts($expected_contexts);
 
     // Clicking a click sort should change the order.
-    $this->clickLink(t('ID'));
-    $this->assertLinkByHref(Url::fromRoute('<none>', [], ['query' => ['order' => 'id', 'sort' => 'desc']])->toString());
+    $this->clickLink('ID');
+    $href = Url::fromRoute('<none>', [], ['query' => ['order' => 'id', 'sort' => 'desc']])->toString();
+    $this->assertSession()->linkByHrefExists($href);
     // Check that the output has the expected order (asc).
     $ids = $this->clickSortLoadIdsFromOutput();
-    $this->assertEqual($ids, range(1, 5));
+    $this->assertEquals(range(1, 5), $ids);
+    // Check that the rel attribute has the correct value.
+    $this->assertSession()->elementAttributeContains('xpath', "//a[@href='$href']", 'rel', 'nofollow');
 
-    $this->clickLink(t('ID Sort descending'));
+    $this->clickLink('ID Sort descending');
     // Check that the output has the expected order (desc).
     $ids = $this->clickSortLoadIdsFromOutput();
-    $this->assertEqual($ids, range(5, 1, -1));
+    $this->assertEquals(range(5, 1, -1), $ids);
+  }
+
+  /**
+   * Tests the default click sorting functionality with distinct.
+   */
+  public function testClickSortingDistinct() {
+    ConfigurableLanguage::createFromLangcode('es')->save();
+    $node = $this->drupalCreateNode();
+    $this->drupalGet('test_distinct_click_sorting');
+    $this->assertSession()->statusCodeEquals(200);
+
+    // Check that the results are ordered by id in ascending order and that the
+    // title click filter is for descending.
+    $this->assertSession()->linkByHrefExists(Url::fromRoute('<none>', [], ['query' => ['order' => 'changed', 'sort' => 'desc']])->toString());
+    $this->assertSession()->pageTextContains($node->getTitle());
+    $this->clickLink('Changed');
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->pageTextContains($node->getTitle());
   }
 
   /**
@@ -113,13 +144,11 @@ class FieldWebTest extends ViewTestBase {
    *   The value to search for.
    * @param string $message
    *   The message to display along with the assertion.
-   * @param string $group
-   *   The type of assertion - examples are "Browser", "PHP".
-   * @return bool
-   *   TRUE if the assertion succeeded, FALSE otherwise.
+   *
+   * @internal
    */
-  protected function assertSubString($haystack, $needle, $message = '', $group = 'Other') {
-    return $this->assertTrue(strpos($haystack, $needle) !== FALSE, $message, $group);
+  protected function assertSubString(string $haystack, string $needle, string $message = ''): void {
+    $this->assertStringContainsString($needle, $haystack, $message);
   }
 
   /**
@@ -131,13 +160,11 @@ class FieldWebTest extends ViewTestBase {
    *   The value to search for.
    * @param string $message
    *   The message to display along with the assertion.
-   * @param string $group
-   *   The type of assertion - examples are "Browser", "PHP".
-   * @return bool
-   *   TRUE if the assertion succeeded, FALSE otherwise.
+   *
+   * @internal
    */
-  protected function assertNotSubString($haystack, $needle, $message = '', $group = 'Other') {
-    return $this->assertTrue(strpos($haystack, $needle) === FALSE, $message, $group);
+  protected function assertNotSubString(string $haystack, string $needle, string $message = ''): void {
+    $this->assertStringNotContainsString($needle, $haystack, $message);
   }
 
   /**
@@ -176,7 +203,7 @@ class FieldWebTest extends ViewTestBase {
    */
   protected function xpathContent($content, $xpath, array $arguments = []) {
     if ($elements = $this->parseContent($content)) {
-      $xpath = $this->buildXPathQuery($xpath, $arguments);
+      $xpath = $this->assertSession()->buildXPathQuery($xpath, $arguments);
       $result = $elements->xpath($xpath);
       // Some combinations of PHP / libxml versions return an empty array
       // instead of the documented FALSE. Forcefully convert any falsish values
@@ -284,25 +311,25 @@ class FieldWebTest extends ViewTestBase {
     $output = $renderer->executeInRenderContext(new RenderContext(), function () use ($id_field, $row) {
       return $id_field->theme($row);
     });
-    // The url has a space in it, so to check we have to decode the url output.
+    // The URL has a space in it, so to check we have to decode the URL output.
     $this->assertSubString(urldecode($output), $path);
 
     // Tests the external flag.
-    // Switch on the external flag should output an external url as well.
+    // Switch on the external flag should output an external URL as well.
     $id_field->options['alter']['external'] = TRUE;
-    $id_field->options['alter']['path'] = $path = 'www.drupal.org';
+    $id_field->options['alter']['path'] = $path = 'www.example.com';
     $output = $renderer->executeInRenderContext(new RenderContext(), function () use ($id_field, $row) {
       return $id_field->theme($row);
     });
-    $this->assertSubString($output, 'http://www.drupal.org');
+    $this->assertSubString($output, 'http://www.example.com');
 
-    // Setup a not external url, which shouldn't lead to an external url.
+    // Setup a not external URL, which shouldn't lead to an external URL.
     $id_field->options['alter']['external'] = FALSE;
-    $id_field->options['alter']['path'] = $path = 'www.drupal.org';
+    $id_field->options['alter']['path'] = $path = 'www.example.com';
     $output = $renderer->executeInRenderContext(new RenderContext(), function () use ($id_field, $row) {
       return $id_field->theme($row);
     });
-    $this->assertNotSubString($output, 'http://www.drupal.org');
+    $this->assertNotSubString($output, 'http://www.example.com');
 
     // Tests the transforming of the case setting.
     $id_field->options['alter']['path'] = $path = $this->randomMachineName();
@@ -346,7 +373,7 @@ class FieldWebTest extends ViewTestBase {
       return $id_field->theme($row);
     });
     $elements = $this->xpathContent($output, '//a[contains(@class, :class)]', [':class' => $class]);
-    $this->assertTrue($elements);
+    $this->assertNotEmpty($elements);
     // @fixme link_class, alt, rel cannot be unset, which should be fixed.
     $id_field->options['alter']['link_class'] = '';
 
@@ -356,7 +383,7 @@ class FieldWebTest extends ViewTestBase {
       return $id_field->theme($row);
     });
     $elements = $this->xpathContent($output, '//a[contains(@title, :alt)]', [':alt' => $rel]);
-    $this->assertTrue($elements);
+    $this->assertNotEmpty($elements);
     $id_field->options['alter']['alt'] = '';
 
     // Tests the rel setting.
@@ -365,7 +392,7 @@ class FieldWebTest extends ViewTestBase {
       return $id_field->theme($row);
     });
     $elements = $this->xpathContent($output, '//a[contains(@rel, :rel)]', [':rel' => $rel]);
-    $this->assertTrue($elements);
+    $this->assertNotEmpty($elements);
     $id_field->options['alter']['rel'] = '';
 
     // Tests the target setting.
@@ -374,7 +401,7 @@ class FieldWebTest extends ViewTestBase {
       return $id_field->theme($row);
     });
     $elements = $this->xpathContent($output, '//a[contains(@target, :target)]', [':target' => $target]);
-    $this->assertTrue($elements);
+    $this->assertNotEmpty($elements);
     unset($id_field->options['alter']['target']);
   }
 
@@ -395,16 +422,16 @@ class FieldWebTest extends ViewTestBase {
     $id_field->options['label'] = $this->randomMachineName();
     $output = $view->preview();
     $output = $renderer->renderRoot($output);
-    $this->assertFalse($this->xpathContent($output, '//div[contains(@class, :class)]', [':class' => 'field-content']));
-    $this->assertFalse($this->xpathContent($output, '//div[contains(@class, :class)]', [':class' => 'field__label']));
+    $this->assertEmpty($this->xpathContent($output, '//div[contains(@class, :class)]', [':class' => 'field-content']));
+    $this->assertEmpty($this->xpathContent($output, '//div[contains(@class, :class)]', [':class' => 'field__label']));
 
     $id_field->options['element_default_classes'] = TRUE;
     $output = $view->preview();
     $output = $renderer->renderRoot($output);
     // Per default the label and the element of the field are spans.
-    $this->assertTrue($this->xpathContent($output, '//span[contains(@class, :class)]', [':class' => 'field-content']));
-    $this->assertTrue($this->xpathContent($output, '//span[contains(@class, :class)]', [':class' => 'views-label']));
-    $this->assertTrue($this->xpathContent($output, '//div[contains(@class, :class)]', [':class' => 'views-field']));
+    $this->assertNotEmpty($this->xpathContent($output, '//span[contains(@class, :class)]', [':class' => 'field-content']));
+    $this->assertNotEmpty($this->xpathContent($output, '//span[contains(@class, :class)]', [':class' => 'views-label']));
+    $this->assertNotEmpty($this->xpathContent($output, '//div[contains(@class, :class)]', [':class' => 'views-field']));
 
     // Tests the element wrapper classes/element.
     $random_class = $this->randomMachineName();
@@ -417,14 +444,14 @@ class FieldWebTest extends ViewTestBase {
       $id_field->options['element_wrapper_class'] = $random_class;
       $output = $view->preview();
       $output = $renderer->renderRoot($output);
-      $this->assertTrue($this->xpathContent($output, "//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
+      $this->assertNotEmpty($this->xpathContent($output, "//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
 
       // Set no custom css class.
       $id_field->options['element_wrapper_class'] = '';
       $output = $view->preview();
       $output = $renderer->renderRoot($output);
-      $this->assertFalse($this->xpathContent($output, "//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
-      $this->assertTrue($this->xpathContent($output, "//li[contains(@class, views-row)]/{$element_type}"));
+      $this->assertEmpty($this->xpathContent($output, "//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
+      $this->assertNotEmpty($this->xpathContent($output, "//li[contains(@class, views-row)]/{$element_type}"));
     }
 
     // Tests the label class/element.
@@ -437,19 +464,19 @@ class FieldWebTest extends ViewTestBase {
       $id_field->options['element_label_class'] = $random_class;
       $output = $view->preview();
       $output = $renderer->renderRoot($output);
-      $this->assertTrue($this->xpathContent($output, "//li[contains(@class, views-row)]//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
+      $this->assertNotEmpty($this->xpathContent($output, "//li[contains(@class, views-row)]//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
 
       // Set no custom css class.
       $id_field->options['element_label_class'] = '';
       $output = $view->preview();
       $output = $renderer->renderRoot($output);
-      $this->assertFalse($this->xpathContent($output, "//li[contains(@class, views-row)]//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
-      $this->assertTrue($this->xpathContent($output, "//li[contains(@class, views-row)]//{$element_type}"));
+      $this->assertEmpty($this->xpathContent($output, "//li[contains(@class, views-row)]//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
+      $this->assertNotEmpty($this->xpathContent($output, "//li[contains(@class, views-row)]//{$element_type}"));
     }
 
     // Tests the element classes/element.
 
-    // Set some common element element types and see whether they appear with and without a custom class set.
+    // Set some common element types and see whether they appear with and without a custom class set.
     foreach (['h1', 'span', 'p', 'div'] as $element_type) {
       $id_field->options['element_type'] = $element_type;
 
@@ -457,14 +484,14 @@ class FieldWebTest extends ViewTestBase {
       $id_field->options['element_class'] = $random_class;
       $output = $view->preview();
       $output = $renderer->renderRoot($output);
-      $this->assertTrue($this->xpathContent($output, "//li[contains(@class, views-row)]//div[contains(@class, views-field)]//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
+      $this->assertNotEmpty($this->xpathContent($output, "//li[contains(@class, views-row)]//div[contains(@class, views-field)]//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
 
       // Set no custom css class.
       $id_field->options['element_class'] = '';
       $output = $view->preview();
       $output = $renderer->renderRoot($output);
-      $this->assertFalse($this->xpathContent($output, "//li[contains(@class, views-row)]//div[contains(@class, views-field)]//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
-      $this->assertTrue($this->xpathContent($output, "//li[contains(@class, views-row)]//div[contains(@class, views-field)]//{$element_type}"));
+      $this->assertEmpty($this->xpathContent($output, "//li[contains(@class, views-row)]//div[contains(@class, views-field)]//{$element_type}[contains(@class, :class)]", [':class' => $random_class]));
+      $this->assertNotEmpty($this->xpathContent($output, "//li[contains(@class, views-row)]//div[contains(@class, views-field)]//{$element_type}"));
     }
 
     // Tests the available html elements.
@@ -486,7 +513,7 @@ class FieldWebTest extends ViewTestBase {
       'marquee',
     ];
 
-    $this->assertEqual(array_keys($element_types), $expected_elements);
+    $this->assertEquals($expected_elements, array_keys($element_types));
   }
 
   /**
@@ -560,14 +587,14 @@ class FieldWebTest extends ViewTestBase {
     $output = $renderer->executeInRenderContext(new RenderContext(), function () use ($name_field, $row) {
       return $name_field->advancedRender($row);
     });
-    $this->assertSubString($output, $trimmed_name, format_string('Make sure the trimmed output (@trimmed) appears in the rendered output (@output).', ['@trimmed' => $trimmed_name, '@output' => $output]));
-    $this->assertNotSubString($output, $row->views_test_data_name, format_string("Make sure the untrimmed value (@untrimmed) shouldn't appear in the rendered output (@output).", ['@untrimmed' => $row->views_test_data_name, '@output' => $output]));
+    $this->assertSubString($output, $trimmed_name, new FormattableMarkup('Make sure the trimmed output (@trimmed) appears in the rendered output (@output).', ['@trimmed' => $trimmed_name, '@output' => $output]));
+    $this->assertNotSubString($output, $row->views_test_data_name, new FormattableMarkup("Make sure the untrimmed value (@untrimmed) shouldn't appear in the rendered output (@output).", ['@untrimmed' => $row->views_test_data_name, '@output' => $output]));
 
     $name_field->options['alter']['max_length'] = 9;
     $output = $renderer->executeInRenderContext(new RenderContext(), function () use ($name_field, $row) {
       return $name_field->advancedRender($row);
     });
-    $this->assertSubString($output, $trimmed_name, format_string('Make sure the untrimmed (@untrimmed) output appears in the rendered output  (@output).', ['@trimmed' => $trimmed_name, '@output' => $output]));
+    $this->assertSubString($output, $trimmed_name, new FormattableMarkup('Make sure the untrimmed (@untrimmed) output appears in the rendered output  (@output).', ['@trimmed' => $trimmed_name, '@output' => $output]));
 
     // Take word_boundary into account for the tests.
     $name_field->options['alter']['max_length'] = 5;
@@ -611,10 +638,10 @@ class FieldWebTest extends ViewTestBase {
       });
 
       if ($tuple['trimmed']) {
-        $this->assertNotSubString($output, $tuple['value'], format_string('The untrimmed value (@untrimmed) should not appear in the trimmed output (@output).', ['@untrimmed' => $tuple['value'], '@output' => $output]));
+        $this->assertNotSubString($output, $tuple['value'], new FormattableMarkup('The untrimmed value (@untrimmed) should not appear in the trimmed output (@output).', ['@untrimmed' => $tuple['value'], '@output' => $output]));
       }
       if (!empty($tuple['trimmed_value'])) {
-        $this->assertSubString($output, $tuple['trimmed_value'], format_string('The trimmed value (@trimmed) should appear in the trimmed output (@output).', ['@trimmed' => $tuple['trimmed_value'], '@output' => $output]));
+        $this->assertSubString($output, $tuple['trimmed_value'], new FormattableMarkup('The trimmed value (@trimmed) should appear in the trimmed output (@output).', ['@trimmed' => $tuple['trimmed_value'], '@output' => $output]));
       }
     }
 
@@ -629,14 +656,14 @@ class FieldWebTest extends ViewTestBase {
       return $name_field->advancedRender($row);
     });
     $this->assertSubString($output, $more_text, 'Make sure a read more text is displayed if the output got trimmed');
-    $this->assertTrue($this->xpathContent($output, '//a[contains(@href, :path)]', [':path' => $more_path]), 'Make sure the read more link points to the right destination.');
+    $this->assertNotEmpty($this->xpathContent($output, '//a[contains(@href, :path)]', [':path' => $more_path]), 'Make sure the read more link points to the right destination.');
 
     $name_field->options['alter']['more_link'] = FALSE;
     $output = $renderer->executeInRenderContext(new RenderContext(), function () use ($name_field, $row) {
       return $name_field->advancedRender($row);
     });
     $this->assertNotSubString($output, $more_text, 'Make sure no read more text appears.');
-    $this->assertFalse($this->xpathContent($output, '//a[contains(@href, :path)]', [':path' => $more_path]), 'Make sure no read more link appears.');
+    $this->assertEmpty($this->xpathContent($output, '//a[contains(@href, :path)]', [':path' => $more_path]), 'Make sure no read more link appears.');
 
     // Check for the ellipses.
     $row->views_test_data_name = $this->randomMachineName(8);

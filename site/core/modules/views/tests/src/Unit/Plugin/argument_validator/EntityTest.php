@@ -28,16 +28,16 @@ class EntityTest extends UnitTestCase {
   protected $display;
 
   /**
-   * The entity manager.
+   * The entity type manager.
    *
-   * @var \PHPUnit_Framework_MockObject_MockObject|\Drupal\Core\Entity\EntityTypeManagerInterface
+   * @var \PHPUnit\Framework\MockObject\MockObject|\Drupal\Core\Entity\EntityTypeManagerInterface
    */
   protected $entityTypeManager;
 
   /**
    * The mocked entity type bundle info used in this test.
    *
-   * @var \Drupal\Core\Entity\EntityTypeBundleInfoInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Entity\EntityTypeBundleInfoInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $entityTypeBundleInfo;
 
@@ -51,7 +51,7 @@ class EntityTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->entityTypeManager = $this->createMock(EntityTypeManagerInterface::class);
@@ -60,28 +60,28 @@ class EntityTest extends UnitTestCase {
     $mock_entity = $this->getMockForAbstractClass('Drupal\Core\Entity\EntityBase', [], '', FALSE, TRUE, TRUE, ['bundle', 'access']);
     $mock_entity->expects($this->any())
       ->method('bundle')
-      ->will($this->returnValue('test_bundle'));
+      ->willReturn('test_bundle');
     $mock_entity->expects($this->any())
       ->method('access')
-      ->will($this->returnValueMap([
+      ->willReturnMap([
         ['test_op', NULL, FALSE, TRUE],
         ['test_op_2', NULL, FALSE, FALSE],
         ['test_op_3', NULL, FALSE, TRUE],
-      ]));
+      ]);
 
     $mock_entity_bundle_2 = $this->getMockForAbstractClass('Drupal\Core\Entity\EntityBase', [], '', FALSE, TRUE, TRUE, ['bundle', 'access']);
     $mock_entity_bundle_2->expects($this->any())
       ->method('bundle')
-      ->will($this->returnValue('test_bundle_2'));
+      ->willReturn('test_bundle_2');
     $mock_entity_bundle_2->expects($this->any())
       ->method('access')
-      ->will($this->returnValueMap([
+      ->willReturnMap([
         ['test_op', NULL, FALSE, FALSE],
         ['test_op_2', NULL, FALSE, FALSE],
         ['test_op_3', NULL, FALSE, TRUE],
-      ]));
+      ]);
 
-    $storage = $this->getMock('Drupal\Core\Entity\EntityStorageInterface');
+    $storage = $this->createMock('Drupal\Core\Entity\EntityStorageInterface');
 
     // Setup values for IDs passed as strings or numbers.
     $value_map = [
@@ -95,12 +95,12 @@ class EntityTest extends UnitTestCase {
     ];
     $storage->expects($this->any())
       ->method('loadMultiple')
-      ->will($this->returnValueMap($value_map));
+      ->willReturnMap($value_map);
 
     $this->entityTypeManager->expects($this->any())
       ->method('getStorage')
       ->with('entity_test')
-      ->will($this->returnValue($storage));
+      ->willReturn($storage);
 
     $this->executable = $this->getMockBuilder('Drupal\views\ViewExecutable')
       ->disableOriginalConstructor()
@@ -129,6 +129,7 @@ class EntityTest extends UnitTestCase {
 
     $this->assertFalse($this->argumentValidator->validateArgument(3));
     $this->assertFalse($this->argumentValidator->validateArgument(''));
+    $this->assertFalse($this->argumentValidator->validateArgument(NULL));
 
     $this->assertTrue($this->argumentValidator->validateArgument(1));
     $this->assertTrue($this->argumentValidator->validateArgument(2));
@@ -176,18 +177,24 @@ class EntityTest extends UnitTestCase {
 
     $this->assertTrue($this->argumentValidator->validateArgument(1));
     $this->assertFalse($this->argumentValidator->validateArgument(2));
+
+    $options['bundles'] = NULL;
+    $this->argumentValidator->init($this->executable, $this->display, $options);
+
+    $this->assertTrue($this->argumentValidator->validateArgument(1));
+    $this->assertTrue($this->argumentValidator->validateArgument(2));
   }
 
   /**
    * @covers ::calculateDependencies
    */
   public function testCalculateDependencies() {
-    // Create an entity manager, storage, entity type, and entity to mock the
+    // Create an entity type manager, storage, entity type, and entity to mock the
     // loading of entities providing bundles.
     $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
-    $storage = $this->getMock('Drupal\Core\Entity\EntityStorageInterface');
-    $entity_type = $this->getMock('Drupal\Core\Entity\EntityTypeInterface');
-    $mock_entity = $this->getMock('Drupal\Core\Entity\EntityInterface');
+    $storage = $this->createMock('Drupal\Core\Entity\EntityStorageInterface');
+    $entity_type = $this->createMock('Drupal\Core\Entity\EntityTypeInterface');
+    $mock_entity = $this->createMock('Drupal\Core\Entity\EntityInterface');
 
     $mock_entity->expects($this->any())
       ->method('getConfigDependencyKey')
@@ -242,6 +249,8 @@ class EntityTest extends UnitTestCase {
 
     $this->assertFalse($this->argumentValidator->validateArgument('1,2'));
     $this->assertFalse($this->argumentValidator->validateArgument('1+2'));
+
+    $this->assertFalse($this->argumentValidator->validateArgument(NULL));
 
     $options = [];
     $options['access'] = TRUE;

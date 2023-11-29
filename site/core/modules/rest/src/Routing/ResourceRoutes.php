@@ -58,7 +58,6 @@ class ResourceRoutes implements EventSubscriberInterface {
    *
    * @param \Drupal\Core\Routing\RouteBuildEvent $event
    *   The route build event.
-   * @return array
    */
   public function onDynamicRouteEvent(RouteBuildEvent $event) {
     // Iterate over all enabled REST resource config entities.
@@ -92,11 +91,9 @@ class ResourceRoutes implements EventSubscriberInterface {
       /** @var \Symfony\Component\Routing\Route $route */
       // @todo: Are multiple methods possible here?
       $methods = $route->getMethods();
-      // Only expose routes
-      // - that have an explicit method and allow >=1 format for that method
-      // - that exist for BC
-      // @see \Drupal\rest\RouteProcessor\RestResourceGetRouteProcessorBC
-      if (($methods && ($method = $methods[0]) && $supported_formats = $rest_resource_config->getFormats($method)) || $route->hasOption('bc_route')) {
+      // Only expose routes that have an explicit method and allow >=1 format
+      // for that method.
+      if (($methods && ($method = $methods[0]) && $rest_resource_config->getFormats($method))) {
         $route->setRequirement('_csrf_request_header_token', 'TRUE');
 
         // Check that authentication providers are defined.
@@ -111,21 +108,13 @@ class ResourceRoutes implements EventSubscriberInterface {
           continue;
         }
 
-        // Remove BC routes for unsupported formats.
-        if ($route->getOption('bc_route') === TRUE) {
-          $format_requirement = $route->getRequirement('_format');
-          if ($format_requirement && !in_array($format_requirement, $rest_resource_config->getFormats($method))) {
-            continue;
-          }
-        }
-
         // The configuration has been validated, so we update the route to:
         // - set the allowed response body content types/formats for methods
         //   that may send response bodies (unless hardcoded by the plugin)
         // - set the allowed request body content types/formats for methods that
         //   allow request bodies to be sent (unless hardcoded by the plugin)
         // - set the allowed authentication providers
-        if (in_array($method, ['GET', 'HEAD', 'POST', 'PUT', 'PATCH'], TRUE) && !$route->hasRequirement('_format')) {
+        if (in_array($method, ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'], TRUE) && !$route->hasRequirement('_format')) {
           $route->addRequirements(['_format' => implode('|', $rest_resource_config->getFormats($method))]);
         }
         if (in_array($method, ['POST', 'PATCH', 'PUT'], TRUE) && !$route->hasRequirement('_content_type_format')) {
@@ -149,7 +138,7 @@ class ResourceRoutes implements EventSubscriberInterface {
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
     $events[RoutingEvents::DYNAMIC] = 'onDynamicRouteEvent';
     return $events;
   }

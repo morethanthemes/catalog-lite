@@ -2,7 +2,6 @@
 
 namespace Drupal\Tests\node\Kernel;
 
-use Drupal\Component\Render\FormattableMarkup;
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\node\Entity\Node;
@@ -10,8 +9,7 @@ use Drupal\node\Entity\NodeType;
 use Drupal\Tests\system\Kernel\Token\TokenReplaceKernelTestBase;
 
 /**
- * Generates text using placeholders for dummy content to check node token
- * replacement.
+ * Tests node token replacement.
  *
  * @group node
  */
@@ -22,12 +20,12 @@ class NodeTokenReplaceTest extends TokenReplaceKernelTestBase {
    *
    * @var array
    */
-  public static $modules = ['node', 'filter'];
+  protected static $modules = ['node', 'filter'];
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->installConfig(['filter', 'node']);
 
@@ -47,7 +45,7 @@ class NodeTokenReplaceTest extends TokenReplaceKernelTestBase {
 
     // Create a user and a node.
     $account = $this->createUser();
-    /* @var $node \Drupal\node\NodeInterface */
+    /** @var \Drupal\node\NodeInterface $node */
     $node = Node::create([
       'type' => 'article',
       'tnid' => 0,
@@ -99,13 +97,13 @@ class NodeTokenReplaceTest extends TokenReplaceKernelTestBase {
     $metadata_tests['[node:changed:since]'] = $bubbleable_metadata;
 
     // Test to make sure that we generated something for each token.
-    $this->assertFalse(in_array(0, array_map('strlen', $tests)), 'No empty tokens generated.');
+    $this->assertNotContains(0, array_map('strlen', $tests), 'No empty tokens generated.');
 
     foreach ($tests as $input => $expected) {
       $bubbleable_metadata = new BubbleableMetadata();
       $output = $this->tokenService->replace($input, ['node' => $node], ['langcode' => $this->interfaceLanguage->getId()], $bubbleable_metadata);
-      $this->assertEqual($output, $expected, format_string('Node token %token replaced.', ['%token' => $input]));
-      $this->assertEqual($bubbleable_metadata, $metadata_tests[$input]);
+      $this->assertSame((string) $expected, (string) $output, "Failed test case: {$input}");
+      $this->assertEquals($metadata_tests[$input], $bubbleable_metadata);
     }
 
     // Repeat for a node without a summary.
@@ -122,11 +120,11 @@ class NodeTokenReplaceTest extends TokenReplaceKernelTestBase {
     $tests['[node:summary]'] = $node->body->processed;
 
     // Test to make sure that we generated something for each token.
-    $this->assertFalse(in_array(0, array_map('strlen', $tests)), 'No empty tokens generated for node without a summary.');
+    $this->assertNotContains(0, array_map('strlen', $tests), 'No empty tokens generated for node without a summary.');
 
     foreach ($tests as $input => $expected) {
       $output = $this->tokenService->replace($input, ['node' => $node], ['language' => $this->interfaceLanguage]);
-      $this->assertEqual($output, $expected, new FormattableMarkup('Node token %token replaced for node without a summary.', ['%token' => $input]));
+      $this->assertSame((string) $expected, (string) $output, "Failed test case: {$input}");
     }
   }
 

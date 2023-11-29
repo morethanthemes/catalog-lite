@@ -6,6 +6,9 @@ use Drupal\Component\FileCache\FileCacheFactory;
 use Drupal\Component\Render\FormattableMarkup;
 use Drupal\Component\Utility\Environment;
 use Drupal\Core\Config\Development\ConfigSchemaChecker;
+use Drupal\Core\Config\FileStorage;
+use Drupal\Core\Config\InstallStorage;
+use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Database\Database;
 use Drupal\Core\DrupalKernel;
 use Drupal\Core\Extension\MissingDependencyException;
@@ -13,11 +16,14 @@ use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Serialization\Yaml;
 use Drupal\Core\Session\UserSession;
 use Drupal\Core\Site\Settings;
+use Drupal\Core\Site\SettingsEditor;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Tests\SessionTestTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
+use Drupal\Core\Routing\RouteObjectInterface;
+use Symfony\Component\Routing\Route;
 
 /**
  * Defines a trait for shared functional test setup functionality.
@@ -37,14 +43,9 @@ trait FunctionalTestSetupTrait {
   /**
    * The class loader to use for installation and initialization of setup.
    *
-   * @var \Symfony\Component\Classloader\Classloader
+   * @var \Composer\Autoload\ClassLoader
    */
   protected $classLoader;
-
-  /**
-   * The config directories used in this test.
-   */
-  protected $configDirectories = [];
 
   /**
    * The flag to set 'apcu_ensure_unique_prefix' setting.
@@ -86,6 +87,10 @@ trait FunctionalTestSetupTrait {
       'value' => $this->privateFilesDirectory,
       'required' => TRUE,
     ];
+    $settings['settings']['file_temp_path'] = (object) [
+      'value' => $this->tempFilesDirectory,
+      'required' => TRUE,
+    ];
     // Save the original site directory path, so that extensions in the
     // site-specific directory can still be discovered in the test site
     // environment.
@@ -94,14 +99,18 @@ trait FunctionalTestSetupTrait {
       'value' => $this->originalSite,
       'required' => TRUE,
     ];
-    // Add the parent profile's search path to the child site's search paths.
-    // @see \Drupal\Core\Extension\ExtensionDiscovery::getProfileDirectories()
-    $settings['conf']['simpletest.settings']['parent_profile'] = (object) [
-      'value' => $this->originalProfile,
-      'required' => TRUE,
-    ];
     $settings['settings']['apcu_ensure_unique_prefix'] = (object) [
       'value' => $this->apcuEnsureUniquePrefix,
+      'required' => TRUE,
+    ];
+    // Disable fetching of advisories during tests to avoid outbound calls. This
+    // cannot be set in ::initConfig() because it would not stop these calls
+    // during install. Tests that need to have the security advisories
+    // functionality enabled should override this method and unset this
+    // variable.
+    // @see \Drupal\Tests\system\Functional\SecurityAdvisories\SecurityAdvisoryTest::writeSettings()
+    $settings['config']['system.advisories']['enabled'] = (object) [
+      'value' => FALSE,
       'required' => TRUE,
     ];
     $this->writeSettings($settings);
@@ -112,7 +121,7 @@ trait FunctionalTestSetupTrait {
       copy($settings_testing_file, $directory . '/settings.testing.php');
       // Add the name of the testing class to settings.php and include the
       // testing specific overrides.
-      file_put_contents($directory . '/settings.php', "\n\$test_class = '" . get_class($this) . "';\n" . 'include DRUPAL_ROOT . \'/\' . $site_path . \'/settings.testing.php\';' . "\n", FILE_APPEND);
+      file_put_contents($directory . '/settings.php', "\n\$test_class = '" . static::class . "';\n" . 'include DRUPAL_ROOT . \'/\' . $site_path . \'/settings.testing.php\';' . "\n", FILE_APPEND);
     }
     $settings_services_file = DRUPAL_ROOT . '/' . $this->originalSite . '/testing.services.yml';
     if (!file_exists($settings_services_file)) {
@@ -126,7 +135,7 @@ trait FunctionalTestSetupTrait {
       $yaml = new SymfonyYaml();
       $content = file_get_contents($directory . '/services.yml');
       $services = $yaml->parse($content);
-      $services['services']['simpletest.config_schema_checker'] = [
+      $services['services']['testing.config_schema_checker'] = [
         'class' => ConfigSchemaChecker::class,
         'arguments' => ['@config.typed', $this->getConfigSchemaExclusions()],
         'tags' => [['name' => 'event_subscriber']],
@@ -144,9 +153,9 @@ trait FunctionalTestSetupTrait {
    *
    * @param array $settings
    *   An array of settings to write out, in the format expected by
-   *   drupal_rewrite_settings().
+   *   SettingsEditor::rewrite().
    *
-   * @see drupal_rewrite_settings()
+   * @see \Drupal\Core\Site\SettingsEditor::rewrite()
    */
   protected function writeSettings(array $settings) {
     include_once DRUPAL_ROOT . '/core/includes/install.inc';
@@ -155,7 +164,7 @@ trait FunctionalTestSetupTrait {
     // whenever it is invoked.
     // Not using File API; a potential error must trigger a PHP warning.
     chmod($filename, 0666);
-    drupal_rewrite_settings($settings, $filename);
+    SettingsEditor::rewrite($filename, $settings);
   }
 
   /**
@@ -190,7 +199,7 @@ trait FunctionalTestSetupTrait {
    * @see TestBase::prepareEnvironment()
    * @see TestBase::restoreEnvironment()
    *
-   * @todo Fix https://www.drupal.org/node/2021959 so that module enable/disable
+   * @todo Fix https://www.drupal.org/node/2941757 so that module enable/disable
    *   changes are immediately reflected in \Drupal::getContainer(). Until then,
    *   tests can invoke this workaround when requiring services from newly
    *   enabled modules to be immediately available in the same request.
@@ -199,7 +208,7 @@ trait FunctionalTestSetupTrait {
     // Rebuild the kernel and bring it back to a fully bootstrapped state.
     $this->container = $this->kernel->rebuildContainer();
 
-    // Make sure the url generator has a request object, otherwise calls to
+    // Make sure the URL generator has a request object, otherwise calls to
     // $this->drupalGet() will fail.
     $this->prepareRequestForGenerator();
   }
@@ -213,7 +222,6 @@ trait FunctionalTestSetupTrait {
    *
    * @see \Drupal\Core\Test\FunctionalTestSetupTrait::rebuildAll()
    * @see \Drupal\Tests\BrowserTestBase::installDrupal()
-   * @see \Drupal\simpletest\WebTestBase::setUp()
    */
   protected function resetAll() {
     // Clear all database and static caches and rebuild data structures.
@@ -229,12 +237,12 @@ trait FunctionalTestSetupTrait {
    *
    * This is used to manipulate how the generator generates paths during tests.
    * It also ensures that calls to $this->drupalGet() will work when running
-   * from run-tests.sh because the url generator no longer looks at the global
+   * from run-tests.sh because the URL generator no longer looks at the global
    * variables that are set there but relies on getting this information from a
    * request object.
    *
    * @param bool $clean_urls
-   *   Whether to mock the request using clean urls.
+   *   Whether to mock the request using clean URLs.
    * @param array $override_server_vars
    *   An array of server variables to override.
    *
@@ -243,36 +251,26 @@ trait FunctionalTestSetupTrait {
    */
   protected function prepareRequestForGenerator($clean_urls = TRUE, $override_server_vars = []) {
     $request = Request::createFromGlobals();
-    $server = $request->server->all();
-    if (basename($server['SCRIPT_FILENAME']) != basename($server['SCRIPT_NAME'])) {
-      // We need this for when the test is executed by run-tests.sh.
-      // @todo Remove this once run-tests.sh has been converted to use a Request
-      //   object.
-      $cwd = getcwd();
-      $server['SCRIPT_FILENAME'] = $cwd . '/' . basename($server['SCRIPT_NAME']);
-      $base_path = rtrim($server['REQUEST_URI'], '/');
-    }
-    else {
-      $base_path = $request->getBasePath();
-    }
+    $base_path = $request->getBasePath();
     if ($clean_urls) {
       $request_path = $base_path ? $base_path . '/user' : 'user';
     }
     else {
       $request_path = $base_path ? $base_path . '/index.php/user' : '/index.php/user';
     }
-    $server = array_merge($server, $override_server_vars);
+
+    $server = array_merge($request->server->all(), $override_server_vars);
 
     $request = Request::create($request_path, 'GET', [], [], [], $server);
     // Ensure the request time is REQUEST_TIME to ensure that API calls
     // in the test use the right timestamp.
     $request->server->set('REQUEST_TIME', REQUEST_TIME);
-    $this->container->get('request_stack')->push($request);
 
+    $this->container->get('request_stack')->push($request);
     // The request context is normally set by the router_listener from within
-    // its KernelEvents::REQUEST listener. In the simpletest parent site this
-    // event is not fired, therefore it is necessary to updated the request
-    // context manually here.
+    // its KernelEvents::REQUEST listener. In the parent site this event is not
+    // fired, therefore it is necessary to update the request context manually
+    // here.
     $this->container->get('router.request_context')->fromRequest($request);
 
     return $request;
@@ -285,7 +283,11 @@ trait FunctionalTestSetupTrait {
    */
   protected function doInstall() {
     require_once DRUPAL_ROOT . '/core/includes/install.core.inc';
-    install_drupal($this->classLoader, $this->installParameters());
+    $parameters = $this->installParameters();
+    // Simulate a real install which does not start with the any connections set
+    // in \Drupal\Core\Database\Database::$connections.
+    Database::removeConnection('default');
+    install_drupal($this->classLoader, $parameters);
   }
 
   /**
@@ -293,9 +295,6 @@ trait FunctionalTestSetupTrait {
    */
   protected function initSettings() {
     Settings::initialize(DRUPAL_ROOT, $this->siteDirectory, $this->classLoader);
-    foreach ($GLOBALS['config_directories'] as $type => $path) {
-      $this->configDirectories[$type] = $path;
-    }
 
     // After writing settings.php, the installer removes write permissions
     // from the site directory. To allow drupal_generate_test_ua() to write
@@ -383,13 +382,60 @@ trait FunctionalTestSetupTrait {
    */
   protected function initKernel(Request $request) {
     $this->kernel = DrupalKernel::createFromRequest($request, $this->classLoader, 'prod', TRUE);
+    $this->kernel->boot();
+    // Add our request to the stack and route context.
+    $request->attributes->set(RouteObjectInterface::ROUTE_OBJECT, new Route('<none>'));
+    $request->attributes->set(RouteObjectInterface::ROUTE_NAME, '<none>');
+    $this->kernel->preHandle($request);
+    return $this->kernel->getContainer();
+  }
 
-    // Force the container to be built from scratch instead of loaded from the
-    // disk. This forces us to not accidentally load the parent site.
-    $this->kernel->invalidateContainer();
+  /**
+   * Installs the default theme defined by `static::$defaultTheme` when needed.
+   *
+   * To install a test theme outside of the testing environment, add
+   * @code
+   * $settings['extension_discovery_scan_tests'] = TRUE;
+   * @endcode
+   * to your settings.php.
+   *
+   * @param \Symfony\Component\DependencyInjection\ContainerInterface $container
+   *   The container.
+   *
+   * @throws \Exception
+   *   If the test case does not initialize default theme.
+   */
+  protected function installDefaultThemeFromClassProperty(ContainerInterface $container) {
+    // Use the install profile to determine the default theme if configured and
+    // not already specified.
+    $profile = $container->getParameter('install_profile');
 
-    $this->kernel->prepareLegacyRequest($request);
-    return \Drupal::getContainer();
+    $default_sync_path = $container->get('extension.list.profile')->getPath($profile) . '/config/sync';
+    $profile_config_storage = new FileStorage($default_sync_path, StorageInterface::DEFAULT_COLLECTION);
+    if (!isset($this->defaultTheme) && $profile_config_storage->exists('system.theme')) {
+      $this->defaultTheme = $profile_config_storage->read('system.theme')['default'];
+    }
+
+    $default_install_path = $container->get('extension.list.profile')->getPath($profile) . '/' . InstallStorage::CONFIG_INSTALL_DIRECTORY;
+    $profile_config_storage = new FileStorage($default_install_path, StorageInterface::DEFAULT_COLLECTION);
+    if (!isset($this->defaultTheme) && $profile_config_storage->exists('system.theme')) {
+      $this->defaultTheme = $profile_config_storage->read('system.theme')['default'];
+    }
+
+    // Require a default theme to be specified at this point.
+    if (!isset($this->defaultTheme)) {
+      throw new \Exception('Drupal\Tests\BrowserTestBase::$defaultTheme is required. See https://www.drupal.org/node/3083055, which includes recommendations on which theme to use.');
+    }
+
+    // Ensure the default theme is installed.
+    $container->get('theme_installer')->install([$this->defaultTheme], TRUE);
+
+    $system_theme_config = $container->get('config.factory')->getEditable('system.theme');
+    if ($system_theme_config->get('default') !== $this->defaultTheme) {
+      $system_theme_config
+        ->set('default', $this->defaultTheme)
+        ->save();
+    }
   }
 
   /**
@@ -405,7 +451,7 @@ trait FunctionalTestSetupTrait {
    *   The container.
    */
   protected function installModulesFromClassProperty(ContainerInterface $container) {
-    $class = get_class($this);
+    $class = static::class;
     $modules = [];
     while ($class) {
       if (property_exists($class, 'modules')) {
@@ -439,7 +485,6 @@ trait FunctionalTestSetupTrait {
     // @todo Test-specific setUp() methods may set up further fixtures; find a
     //   way to execute this after setUp() is done, or to eliminate it entirely.
     $this->resetAll();
-    $this->kernel->prepareLegacyRequest(\Drupal::request());
 
     // Explicitly call register() again on the container registered in \Drupal.
     // @todo This should already be called through
@@ -449,7 +494,7 @@ trait FunctionalTestSetupTrait {
   }
 
   /**
-   * Returns the parameters that will be used when Simpletest installs Drupal.
+   * Returns the parameters that will be used when the test installs Drupal.
    *
    * @see install_drupal()
    * @see install_state_defaults()
@@ -460,11 +505,12 @@ trait FunctionalTestSetupTrait {
   protected function installParameters() {
     $connection_info = Database::getConnectionInfo();
     $driver = $connection_info['default']['driver'];
-    $connection_info['default']['prefix'] = $connection_info['default']['prefix']['default'];
     unset($connection_info['default']['driver']);
     unset($connection_info['default']['namespace']);
+    unset($connection_info['default']['autoload']);
     unset($connection_info['default']['pdo']);
     unset($connection_info['default']['init_commands']);
+    unset($connection_info['default']['isolation_level']);
     // Remove database connection info that is not used by SQLite.
     if ($driver === 'sqlite') {
       unset($connection_info['default']['username']);
@@ -490,12 +536,13 @@ trait FunctionalTestSetupTrait {
             'name' => $this->rootUser->name,
             'mail' => $this->rootUser->getEmail(),
             'pass' => [
-              'pass1' => isset($this->rootUser->pass_raw) ? $this->rootUser->pass_raw : $this->rootUser->passRaw,
-              'pass2' => isset($this->rootUser->pass_raw) ? $this->rootUser->pass_raw : $this->rootUser->passRaw,
+              'pass1' => $this->rootUser->pass_raw ?? $this->rootUser->passRaw,
+              'pass2' => $this->rootUser->pass_raw ?? $this->rootUser->passRaw,
             ],
           ],
-          // form_type_checkboxes_value() requires NULL instead of FALSE values
-          // for programmatic form submissions to disable a checkbox.
+          // \Drupal\Core\Render\Element\Checkboxes::valueCallback() requires
+          // NULL instead of FALSE values for programmatic form submissions to
+          // disable a checkbox.
           'enable_update_status_module' => NULL,
           'enable_update_status_emails' => NULL,
         ],
@@ -514,7 +561,7 @@ trait FunctionalTestSetupTrait {
    * Sets up the base URL based upon the environment variable.
    *
    * @throws \Exception
-   *   Thrown when no SIMPLETEST_BASE_URL environment variable is provided.
+   *   Thrown when no SIMPLETEST_BASE_URL environment variable is provided or uses an invalid scheme.
    */
   protected function setupBaseUrl() {
     global $base_url;
@@ -532,7 +579,14 @@ trait FunctionalTestSetupTrait {
     $parsed_url = parse_url($base_url);
     $host = $parsed_url['host'] . (isset($parsed_url['port']) ? ':' . $parsed_url['port'] : '');
     $path = isset($parsed_url['path']) ? rtrim(rtrim($parsed_url['path']), '/') : '';
-    $port = isset($parsed_url['port']) ? $parsed_url['port'] : 80;
+    $port = $parsed_url['port'] ?? 80;
+
+    $valid_url_schemes = ['http', 'https'];
+    if (!in_array(strtolower($parsed_url['scheme']), $valid_url_schemes, TRUE)) {
+      throw new \Exception(
+        'You must provide valid scheme for the SIMPLETEST_BASE_URL environment variable. Valid schema are: http, https.'
+      );
+    }
 
     $this->baseUrl = $base_url;
 
@@ -560,11 +614,6 @@ trait FunctionalTestSetupTrait {
    *
    * Also sets up new resources for the testing environment, such as the public
    * filesystem and configuration directories.
-   *
-   * This method is private as it must only be called once by
-   * BrowserTestBase::setUp() (multiple invocations for the same test would have
-   * unpredictable consequences) and it must not be callable or overridable by
-   * test classes.
    */
   protected function prepareEnvironment() {
     // Bootstrap Drupal so we can use Drupal's built in functions.
@@ -573,7 +622,8 @@ trait FunctionalTestSetupTrait {
     $kernel = TestRunnerKernel::createFromRequest($request, $this->classLoader);
     // TestRunnerKernel expects the working directory to be DRUPAL_ROOT.
     chdir(DRUPAL_ROOT);
-    $kernel->prepareLegacyRequest($request);
+    $kernel->boot();
+    $kernel->preHandle($request);
     $this->prepareDatabasePrefix();
 
     $this->originalSite = $kernel->findSitePath($request);
@@ -603,7 +653,6 @@ trait FunctionalTestSetupTrait {
     $this->container = NULL;
 
     // Unset globals.
-    unset($GLOBALS['config_directories']);
     unset($GLOBALS['config']);
     unset($GLOBALS['conf']);
 

@@ -27,7 +27,7 @@ trait BlockCreationTrait {
    *   @endcode
    *   The following defaults are provided:
    *   - label: Random string.
-   *   - ID: Random string.
+   *   - id: Random string.
    *   - region: 'sidebar_first'.
    *   - theme: The default theme.
    *   - visibility: Empty array.
@@ -36,13 +36,13 @@ trait BlockCreationTrait {
    *   The block entity.
    *
    * @todo
-   *   Add support for creating custom block instances.
+   *   Add support for creating content block instances.
    */
   protected function placeBlock($plugin_id, array $settings = []) {
     $config = \Drupal::configFactory();
     $settings += [
       'plugin' => $plugin_id,
-      'region' => 'sidebar_first',
+      'region' => 'content',
       'id' => strtolower($this->randomMachineName(8)),
       'theme' => $config->get('system.theme')->get('default'),
       'label' => $this->randomMachineName(8),

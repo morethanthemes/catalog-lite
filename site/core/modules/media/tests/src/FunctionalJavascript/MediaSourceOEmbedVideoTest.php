@@ -4,6 +4,7 @@ namespace Drupal\Tests\media\FunctionalJavascript;
 
 use Drupal\Core\Session\AccountInterface;
 use Drupal\media\Entity\Media;
+use Drupal\media\Entity\MediaType;
 use Drupal\media_test_oembed\Controller\ResourceController;
 use Drupal\Tests\media\Traits\OEmbedTestTrait;
 use Drupal\user\Entity\Role;
@@ -19,14 +20,19 @@ class MediaSourceOEmbedVideoTest extends MediaSourceTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['media_test_oembed'];
+  protected static $modules = ['media_test_oembed'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   use OEmbedTestTrait;
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->lockHttpClientToFixtures();
   }
@@ -93,10 +99,10 @@ class MediaSourceOEmbedVideoTest extends MediaSourceTestBase {
 
     // Configure the iframe to be narrower than the actual video, so we can
     // verify that the video scales correctly.
-    $display = entity_get_display('media', $media_type_id, 'default');
+    $display = \Drupal::service('entity_display.repository')->getViewDisplay('media', $media_type_id);
     $this->assertFalse($display->isNew());
     $component = $display->getComponent('field_media_oembed_video');
-    $this->assertInternalType('array', $component);
+    $this->assertIsArray($component);
     $component['settings']['max_width'] = 240;
     $display->setComponent('field_media_oembed_video', $component);
     $this->assertSame(SAVED_UPDATED, $display->save());
@@ -141,8 +147,10 @@ class MediaSourceOEmbedVideoTest extends MediaSourceTestBase {
     $this->assertSame('480', $session->evaluateScript("$inner_frame.getAttribute('width')"));
     $this->assertLessThanOrEqual(240, $session->evaluateScript("$inner_frame.clientWidth"));
 
-    // Make sure the thumbnail is displayed from uploaded image.
-    $assert_session->elementAttributeContains('css', '.image-style-thumbnail', 'src', '/oembed_thumbnails/' . basename($thumbnail));
+    // The oEmbed content iFrame should be visible.
+    $assert_session->elementExists('css', 'iframe.media-oembed-content');
+    // The thumbnail should not be displayed.
+    $assert_session->elementNotExists('css', 'img');
 
     // Load the media and check that all fields are properly populated.
     $media = Media::load(1);
@@ -157,41 +165,54 @@ class MediaSourceOEmbedVideoTest extends MediaSourceTestBase {
 
     $assert_session->pageTextContains('The CollegeHumor provider is not allowed.');
 
+    // Register a CollegeHumor video as a second oEmbed resource. Note that its
+    // thumbnail URL does not have a file extension.
+    $media_type = MediaType::load($media_type_id);
+    $source_configuration = $media_type->getSource()->getConfiguration();
+    $source_configuration['providers'][] = 'CollegeHumor';
+    $media_type->getSource()->setConfiguration($source_configuration);
+    $media_type->save();
+    $video_url = 'http://www.collegehumor.com/video/40003213/let-not-get-a-drink-sometime';
+    ResourceController::setResourceUrl($video_url, $this->getFixturesDirectory() . '/video_collegehumor.xml');
+
+    // Create a new media item using a CollegeHumor video.
+    $this->drupalGet("media/add/$media_type_id");
+    $assert_session->fieldExists('Remote video URL')->setValue($video_url);
+    $assert_session->buttonExists('Save')->press();
+
+    /** @var \Drupal\media\MediaInterface $media */
+    $media = Media::load(2);
+    $thumbnail = $media->getSource()->getMetadata($media, 'thumbnail_uri');
+    $this->assertFileExists($thumbnail);
+    // Although the resource's thumbnail URL doesn't have a file extension, we
+    // should have deduced the correct one.
+    $this->assertStringEndsWith('.png', $thumbnail);
+
     // Test anonymous access to media via iframe.
     $this->drupalLogout();
 
     // Without a hash should be denied.
     $no_hash_query = array_diff_key($query, ['hash' => '']);
     $this->drupalGet('media/oembed', ['query' => $no_hash_query]);
-    $assert_session->pageTextNotContains('By the power of Greyskull, Vimeo works!');
-    $assert_session->pageTextContains('Access denied');
+    $assert_session->pageTextNotContains('By the power of Grayskull, Vimeo works!');
+    $assert_session->pageTextContains('Client error');
 
     // A correct query should be allowed because the anonymous role has the
     // 'view media' permission.
     $this->drupalGet('media/oembed', ['query' => $query]);
-    $assert_session->pageTextContains('By the power of Greyskull, Vimeo works!');
-    $this->assertRaw('core/themes/stable/templates/content/media-oembed-iframe.html.twig');
-    $this->assertNoRaw('core/modules/media/templates/media-oembed-iframe.html.twig');
-
-    // Test themes not inheriting from stable.
-    \Drupal::service('theme_handler')->install(['stark']);
-    $this->config('system.theme')->set('default', 'stark')->save();
-    $this->drupalGet('media/oembed', ['query' => $query]);
-    $assert_session->pageTextContains('By the power of Greyskull, Vimeo works!');
-    $this->assertNoRaw('core/themes/stable/templates/content/media-oembed-iframe.html.twig');
-    $this->assertRaw('core/modules/media/templates/media-oembed-iframe.html.twig');
+    $assert_session->pageTextContains('By the power of Grayskull, Vimeo works!');
 
     // Remove the 'view media' permission to test that this restricts access.
     $role = Role::load(AccountInterface::ANONYMOUS_ROLE);
     $role->revokePermission('view media');
     $role->save();
     $this->drupalGet('media/oembed', ['query' => $query]);
-    $assert_session->pageTextNotContains('By the power of Greyskull, Vimeo works!');
+    $assert_session->pageTextNotContains('By the power of Grayskull, Vimeo works!');
     $assert_session->pageTextContains('Access denied');
   }
 
   /**
-   * Test that a security warning appears if iFrame domain is not set.
+   * Tests that a security warning appears if iFrame domain is not set.
    */
   public function testOEmbedSecurityWarning() {
     $media_type_id = 'test_media_oembed_type';

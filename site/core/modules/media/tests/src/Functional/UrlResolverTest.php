@@ -18,7 +18,12 @@ class UrlResolverTest extends MediaFunctionalTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected $defaultTheme = 'stark';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
     parent::setUp();
     $this->lockHttpClientToFixtures();
     $this->useFixtureProviders();
@@ -45,12 +50,15 @@ class UrlResolverTest extends MediaFunctionalTestBase {
         'http://www.collegehumor.com/video/40002870/lets-not-get-a-drink-sometime',
         'http://www.collegehumor.com/oembed.json?url=http://www.collegehumor.com/video/40002870/lets-not-get-a-drink-sometime',
       ],
+      'match by endpoint: Facebook' => [
+        'https://www.facebook.com/facebook/videos/10153231379946729/',
+        'https://www.facebook.com/plugins/video/oembed.json?url=https://www.facebook.com/facebook/videos/10153231379946729/',
+      ],
     ];
   }
 
   /**
-   * Tests resource URL resolution when the asset URL can be matched to a
-   * provider endpoint.
+   * Tests resource URL resolution with a matched provider endpoint.
    *
    * @covers ::getProviderByUrl
    * @covers ::getResourceUrl
@@ -80,7 +88,7 @@ class UrlResolverTest extends MediaFunctionalTestBase {
     $resource_url = $this->container->get('media.oembed.url_resolver')
       ->getResourceUrl('https://vimeo.com/14782834');
 
-    $this->assertContains('altered=1', parse_url($resource_url, PHP_URL_QUERY));
+    $this->assertStringContainsString('altered=1', parse_url($resource_url, PHP_URL_QUERY));
   }
 
   /**
@@ -109,8 +117,7 @@ class UrlResolverTest extends MediaFunctionalTestBase {
   }
 
   /**
-   * Tests URL resolution when the resource URL must be actively discovered by
-   * scanning the asset.
+   * Tests URL resolution when the URL is discovered by scanning the asset.
    *
    * @param string $url
    *   The asset URL to resolve.

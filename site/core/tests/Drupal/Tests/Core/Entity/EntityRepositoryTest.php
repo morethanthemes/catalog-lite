@@ -13,7 +13,7 @@ use Drupal\Tests\UnitTestCase;
 use Prophecy\Argument;
 
 /**
- * @coversDefaultClass \Drupal\Core\Entity\EntityManager
+ * @coversDefaultClass \Drupal\Core\Entity\EntityRepository
  * @group Entity
  */
 class EntityRepositoryTest extends UnitTestCase {
@@ -49,7 +49,7 @@ class EntityRepositoryTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->entityTypeManager = $this->prophesize(EntityTypeManagerInterface::class);

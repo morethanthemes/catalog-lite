@@ -1,0 +1,9 @@
+name: 'Semver Test'
+type: module
+description: 'Support module for update module testing.'
+package: Testing
+
+# Information added by Drupal.org packaging script on 2023-11-01
+version: '10.1.6'
+project: 'drupal'
+datestamp: 1698841355

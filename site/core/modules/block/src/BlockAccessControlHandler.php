@@ -19,7 +19,7 @@ use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Defines the access control handler for the block entity type.
+ * Defines the access control handler for the content block entity type.
  *
  * @see \Drupal\block\Entity\Block
  */
@@ -53,7 +53,7 @@ class BlockAccessControlHandler extends EntityAccessControlHandler implements En
   }
 
   /**
-   * Constructs the block access control handler instance
+   * Constructs the block access control handler instance.
    *
    * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
    *   The entity type definition.
