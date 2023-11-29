@@ -4,6 +4,7 @@ namespace Drupal\Tests\views\Functional\Handler;
 
 use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\Tests\views\Functional\ViewTestBase;
+use Drupal\views\Plugin\views\filter\NumericFilter;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\HandlerBase;
 use Drupal\views\Plugin\views\filter\InOperator;
@@ -23,8 +24,7 @@ class HandlerAllTest extends ViewTestBase {
    *
    * @var array
    */
-  public static $modules = [
-    'aggregator',
+  protected static $modules = [
     'book',
     'block',
     'comment',
@@ -32,16 +32,19 @@ class HandlerAllTest extends ViewTestBase {
     'field',
     'filter',
     'file',
-    'forum',
     'history',
     'language',
     'locale',
     'node',
     'search',
-    'statistics',
     'taxonomy',
     'user',
   ];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * Tests most of the handlers.
@@ -51,7 +54,7 @@ class HandlerAllTest extends ViewTestBase {
     $this->addDefaultCommentField('node', 'article');
 
     $object_types = array_keys(ViewExecutable::getHandlerTypes());
-    foreach ($this->container->get('views.views_data')->get() as $base_table => $info) {
+    foreach ($this->container->get('views.views_data')->getAll() as $base_table => $info) {
       if (!isset($info['table']['base'])) {
         continue;
       }
@@ -65,7 +68,7 @@ class HandlerAllTest extends ViewTestBase {
 
       // Go through all fields and there through all handler types.
       foreach ($info as $field => $field_info) {
-        // Table is a reserved key for the metainformation.
+        // Table is a reserved key for the meta-information.
         if ($field != 'table' && !in_array("$base_table:$field", $exclude)) {
           $item = [
             'table' => $base_table,
@@ -79,6 +82,9 @@ class HandlerAllTest extends ViewTestBase {
                 // Set the value to use for the filter based on the filter type.
                 if ($handler instanceof InOperator) {
                   $options['value'] = [1];
+                }
+                elseif ($handler instanceof NumericFilter) {
+                  $options['value'] = ['value' => 1];
                 }
                 else {
                   $options['value'] = 1;
@@ -101,12 +107,7 @@ class HandlerAllTest extends ViewTestBase {
       foreach ($object_types as $type) {
         if (isset($view->{$type})) {
           foreach ($view->{$type} as $handler) {
-            $this->assertTrue($handler instanceof HandlerBase, format_string(
-              '@type handler of class %class is an instance of HandlerBase',
-              [
-                '@type' => $type,
-                '%class' => get_class($handler),
-              ]));
+            $this->assertInstanceOf(HandlerBase::class, $handler);
           }
         }
       }

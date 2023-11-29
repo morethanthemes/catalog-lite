@@ -41,10 +41,9 @@ to install the following additional software:
 
 * Google Chrome or Chromium browser
 * chromedriver (tested with version 2.45) -- see
-  https://sites.google.com/a/chromium.org/chromedriver/
-* PHP 7.1 or higher
+  https://sites.google.com/chromium.org/driver/
 
-## Running unit, functional, and kernel tests
+## Running tests
 
 The PHPUnit executable is vendor/bin/phpunit -- you will need to locate your
 vendor directory (which may be outside the Drupal root).
@@ -57,10 +56,30 @@ a particular group:
 ./vendor/bin/phpunit -c /path/to/your/phpunit.xml --group Groupname
 ```
 
+Drupal core currently has a number of different types of tests that can be run
+using PHPUnit:
+- unit
+- kernel
+- functional
+- functional-javascript
+- build
+
+These are organized into PHPUnit test suites. You can run one test suite or many
+in combination by using `--testsuite` on the command line:
+```
+./vendor/bin/phpunit -c /path/to/your/phpunit.xml --testsuite unit
+./vendor/bin/phpunit -c /path/to/your/phpunit.xml --testsuite functional,functional-javascript
+```
+These can be combined with groups and filters:
+```
+./vendor/bin/phpunit -c /path/to/your/phpunit.xml --testsuite build --group Composer
+./vendor/bin/phpunit -c /path/to/your/phpunit.xml --testsuite build --exclude-group Build
+./vendor/bin/phpunit -c /path/to/your/phpunit.xml --testsuite unit --filter ClassTest::testMethod
+```
 More information on running tests can be found at
 https://www.drupal.org/docs/8/phpunit/running-phpunit-tests
 
-## Running Functional JavaScript tests
+## Setup for running Functional JavaScript tests
 
 You can run JavaScript tests that are based on the
 \Drupal\FunctionalJavascriptTests\WebDriverTestBase base class in the same way
@@ -74,8 +93,6 @@ chromedriver using port 4444, and keep it running:
 
 * Ensure your vendor directory is populated
   (e.g. by running `composer install`)
-* If you're running PHP 7.0 or greater you will need to upgrade PHPUnit with
-  `composer run-script drupal-phpunit-upgrade`
 * Install [Node.js](https://nodejs.org/en/download/) and
   [yarn](https://yarnpkg.com/en/docs/install). The versions required are
   specified inside core/package.json in the `engines` field. You can use
@@ -97,6 +114,16 @@ chromedriver using port 4444, and keep it running:
 * To skip running core tests, run `yarn test:nightwatch --skiptags core`
 * To run a single test, run e.g.
   `yarn test:nightwatch tests/Drupal/Nightwatch/Tests/exampleTest.js`
+* To run a11y tests for both the admin and default themes.
+  `yarn test:nightwatch --tag a11y`
+* To run a11y tests for the admin theme only.
+  `yarn test:nightwatch --tag a11y:admin`
+* To run a11y tests for the default theme only.
+  `yarn test:nightwatch --tag a11y:default`
+* To run an a11y test for a custom theme used as the default theme.
+  `yarn test:nightwatch --tag a11y:default --defaultTheme bartik`
+* To run an a11y test for a custom admin theme.
+  `yarn test:nightwatch --tag a11y:admin --adminTheme seven`
 
 Nightwatch tests, as well as custom commands, assertions and pages, can be
 placed in any folder with the pattern

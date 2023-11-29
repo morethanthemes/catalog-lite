@@ -20,7 +20,6 @@ use Drupal\Core\Render\Element;
  */
 function template_preprocess_file_widget_multiple(&$variables) {
   $element = $variables['element'];
-
   // Special ID and classes for draggable tables.
   $weight_class = $element['#id'] . '-weight';
   $table_id = $element['#id'] . '-table';
@@ -46,7 +45,7 @@ function template_preprocess_file_widget_multiple(&$variables) {
   usort($widgets, '_field_multiple_value_form_sort_helper');
 
   $rows = [];
-  foreach ($widgets as $key => &$widget) {
+  foreach ($widgets as &$widget) {
     // Save the uploading row for last.
     if (empty($widget['#files'])) {
       $widget['#title'] = $element['#file_upload_title'];
@@ -57,10 +56,10 @@ function template_preprocess_file_widget_multiple(&$variables) {
     // Delay rendering of the buttons, so that they can be rendered later in the
     // "operations" column.
     $operations_elements = [];
-    foreach (Element::children($widget) as $sub_key) {
-      if (isset($widget[$sub_key]['#type']) && $widget[$sub_key]['#type'] == 'submit') {
-        hide($widget[$sub_key]);
-        $operations_elements[] = &$widget[$sub_key];
+    foreach (Element::children($widget) as $key) {
+      if (isset($widget[$key]['#type']) && $widget[$key]['#type'] == 'submit') {
+        hide($widget[$key]);
+        $operations_elements[] = &$widget[$key];
       }
     }
 
@@ -70,28 +69,24 @@ function template_preprocess_file_widget_multiple(&$variables) {
       hide($widget['display']);
     }
     hide($widget['_weight']);
+    $widget['_weight']['#attributes']['class'] = [$weight_class];
 
     // Render everything else together in a column, without the normal wrappers.
+    $row = [];
     $widget['#theme_wrappers'] = [];
-    $information = \Drupal::service('renderer')->render($widget);
-    $display = '';
+    $row[] = \Drupal::service('renderer')->render($widget);
+
+    // Arrange the row with the rest of the rendered columns.
     if ($element['#display_field']) {
       unset($widget['display']['#title']);
-      $display = [
-        'data' => render($widget['display']),
+      $row[] = [
+        'data' => $widget['display'],
         'class' => ['checkbox'],
       ];
     }
-    $widget['_weight']['#attributes']['class'] = [$weight_class];
-    $weight = render($widget['_weight']);
-
-    // Arrange the row with all of the rendered columns.
-    $row = [];
-    $row[] = $information;
-    if ($element['#display_field']) {
-      $row[] = $display;
-    }
-    $row[] = $weight;
+    $row[] = [
+      'data' => $widget['_weight'],
+    ];
 
     // Show the buttons that had previously been marked as hidden in this
     // preprocess function. We use show() to undo the earlier hide().

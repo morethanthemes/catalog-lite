@@ -5,6 +5,7 @@ namespace Drupal\Core\TempStore;
 use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 use Drupal\Core\KeyValueStore\KeyValueStoreExpirableInterface;
 use Drupal\Core\Lock\LockBackendInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
@@ -69,6 +70,13 @@ class SharedTempStore {
   protected $owner;
 
   /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountProxyInterface
+   */
+  protected $currentUser;
+
+  /**
    * The time to live for items in seconds.
    *
    * By default, data is stored for one week (604800 seconds) before expiring.
@@ -90,14 +98,17 @@ class SharedTempStore {
    *   The owner key to store along with the data (e.g. a user or session ID).
    * @param \Symfony\Component\HttpFoundation\RequestStack $request_stack
    *   The request stack.
+   * @param \Drupal\Core\Session\AccountProxyInterface $current_user
+   *   The current user.
    * @param int $expire
    *   The time to live for items, in seconds.
    */
-  public function __construct(KeyValueStoreExpirableInterface $storage, LockBackendInterface $lock_backend, $owner, RequestStack $request_stack, $expire = 604800) {
+  public function __construct(KeyValueStoreExpirableInterface $storage, LockBackendInterface $lock_backend, $owner, RequestStack $request_stack, AccountProxyInterface $current_user, $expire = 604800) {
     $this->storage = $storage;
     $this->lockBackend = $lock_backend;
     $this->owner = $owner;
     $this->requestStack = $request_stack;
+    $this->currentUser = $current_user;
     $this->expire = $expire;
   }
 
@@ -148,9 +159,11 @@ class SharedTempStore {
     $value = (object) [
       'owner' => $this->owner,
       'data' => $value,
-      'updated' => (int) $this->requestStack->getMasterRequest()->server->get('REQUEST_TIME'),
+      'updated' => (int) $this->requestStack->getMainRequest()->server->get('REQUEST_TIME'),
     ];
-    return $this->storage->setWithExpireIfNotExists($key, $value, $this->expire);
+    $this->ensureAnonymousSession();
+    $set = $this->storage->setWithExpireIfNotExists($key, $value, $this->expire);
+    return $set;
   }
 
   /**
@@ -206,8 +219,9 @@ class SharedTempStore {
     $value = (object) [
       'owner' => $this->owner,
       'data' => $value,
-      'updated' => (int) $this->requestStack->getMasterRequest()->server->get('REQUEST_TIME'),
+      'updated' => (int) $this->requestStack->getMainRequest()->server->get('REQUEST_TIME'),
     ];
+    $this->ensureAnonymousSession();
     $this->storage->setWithExpire($key, $value, $this->expire);
     $this->lockBackend->release($key);
   }
@@ -277,6 +291,19 @@ class SharedTempStore {
     }
 
     return FALSE;
+  }
+
+  /**
+   * Stores the owner in the session if the user is anonymous.
+   *
+   * This method should be called when a value is set.
+   */
+  protected function ensureAnonymousSession() {
+    // If this is being run from the CLI then the request will not have a
+    // session.
+    if ($this->currentUser->isAnonymous() && $this->requestStack->getCurrentRequest()->hasSession()) {
+      $this->requestStack->getCurrentRequest()->getSession()->set('core.tempstore.shared.owner', $this->owner);
+    }
   }
 
 }

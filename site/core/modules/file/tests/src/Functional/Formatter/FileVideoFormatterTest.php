@@ -12,6 +12,11 @@ use Drupal\file\Entity\File;
 class FileVideoFormatterTest extends FileMediaFormatterTestBase {
 
   /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
+
+  /**
    * @covers ::viewElements
    *
    * @dataProvider dataProvider
@@ -87,7 +92,7 @@ class FileVideoFormatterTest extends FileMediaFormatterTestBase {
 
     $this->drupalGet($entity->toUrl());
 
-    $file_url = file_url_transform_relative(file_create_url($file->getFileUri()));
+    $file_url = \Drupal::service('file_url_generator')->generateString($file->getFileUri());
 
     $assert_session = $this->assertSession();
     $assert_session->elementExists('css', "video[autoplay='autoplay'] > source[src='$file_url'][type='video/mp4']");

@@ -17,11 +17,6 @@ class EntityNormalizer extends ComplexDataNormalizer implements DenormalizerInte
   use FieldableEntityNormalizerTrait;
 
   /**
-   * {@inheritdoc}
-   */
-  protected $supportedInterfaceOrClass = EntityInterface::class;
-
-  /**
    * Constructs an EntityNormalizer object.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
@@ -31,24 +26,16 @@ class EntityNormalizer extends ComplexDataNormalizer implements DenormalizerInte
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entity_field_manager
    *   The entity field manager.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityTypeRepositoryInterface $entity_type_repository = NULL, EntityFieldManagerInterface $entity_field_manager = NULL) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityTypeRepositoryInterface $entity_type_repository, EntityFieldManagerInterface $entity_field_manager) {
     $this->entityTypeManager = $entity_type_manager;
-    if (!$entity_type_repository) {
-      @trigger_error('The entity_type.repository service must be passed to EntityNormalizer::__construct(), it is required before Drupal 9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_type_repository = \Drupal::service('entity_type.repository');
-    }
     $this->entityTypeRepository = $entity_type_repository;
-    if (!$entity_field_manager) {
-      @trigger_error('The entity_field.manager service must be passed to EntityNormalizer::__construct(), it is required before Drupal 9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_field_manager = \Drupal::service('entity_field.manager');
-    }
     $this->entityFieldManager = $entity_field_manager;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function denormalize($data, $class, $format = NULL, array $context = []) {
+  public function denormalize($data, $class, $format = NULL, array $context = []): mixed {
     $entity_type_id = $this->determineEntityTypeId($class, $context);
     $entity_type_definition = $this->getEntityTypeDefinition($entity_type_id);
 
@@ -81,6 +68,15 @@ class EntityNormalizer extends ComplexDataNormalizer implements DenormalizerInte
     $entity->_restSubmittedFields = array_keys($data);
 
     return $entity;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSupportedTypes(?string $format): array {
+    return [
+      EntityInterface::class => TRUE,
+    ];
   }
 
 }

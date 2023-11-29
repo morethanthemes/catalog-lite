@@ -16,10 +16,13 @@ class UserMailRequiredValidator extends ConstraintValidator {
 
   /**
    * {@inheritdoc}
+   *
+   * phpcs:ignore Drupal.Commenting.FunctionComment.VoidReturn
+   * @return void
    */
   public function validate($items, Constraint $constraint) {
     /** @var \Drupal\Core\Field\FieldItemListInterface $items */
-    /* @var \Drupal\user\UserInterface $account */
+    /** @var \Drupal\user\UserInterface $account */
     $account = $items->getEntity();
     if (!isset($account)) {
       return;

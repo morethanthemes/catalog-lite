@@ -13,8 +13,10 @@ use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Link;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -72,6 +74,8 @@ class CommentForm extends ContentEntityForm {
    *   The entity type bundle service.
    * @param \Drupal\Component\Datetime\TimeInterface $time
    *   The time service.
+   * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entity_field_manager
+   *   The entity field manager service.
    */
   public function __construct(EntityRepositoryInterface $entity_repository, AccountInterface $current_user, RendererInterface $renderer, EntityTypeBundleInfoInterface $entity_type_bundle_info = NULL, TimeInterface $time = NULL, EntityFieldManagerInterface $entity_field_manager = NULL) {
     parent::__construct($entity_repository, $entity_type_bundle_info, $time);
@@ -116,7 +120,7 @@ class CommentForm extends ContentEntityForm {
     // If not replying to a comment, use our dedicated page callback for new
     // Comments on entities.
     if (!$comment->id() && !$comment->hasParentComment()) {
-      $form['#action'] = $this->url('comment.reply', ['entity_type' => $entity->getEntityTypeId(), 'entity' => $entity->id(), 'field_name' => $field_name]);
+      $form['#action'] = Url::fromRoute('comment.reply', ['entity_type' => $entity->getEntityTypeId(), 'entity' => $entity->id(), 'field_name' => $field_name])->toString();
     }
 
     $comment_preview = $form_state->get('comment_preview');
@@ -139,7 +143,7 @@ class CommentForm extends ContentEntityForm {
       if (!$comment->getOwnerId()) {
         $author = $comment->getAuthorName();
       }
-      $status = $comment->getStatus();
+      $status = $comment->isPublished() ? CommentInterface::PUBLISHED : CommentInterface::NOT_PUBLISHED;
       if (empty($comment_preview)) {
         $form['#title'] = $this->t('Edit comment %title', [
           '%title' => $comment->getSubject(),
@@ -238,7 +242,7 @@ class CommentForm extends ContentEntityForm {
       '#access' => $is_admin,
     ];
 
-    return parent::form($form, $form_state, $comment);
+    return parent::form($form, $form_state);
   }
 
   /**
@@ -246,7 +250,7 @@ class CommentForm extends ContentEntityForm {
    */
   protected function actions(array $form, FormStateInterface $form_state) {
     $element = parent::actions($form, $form_state);
-    /* @var \Drupal\comment\CommentInterface $comment */
+    /** @var \Drupal\comment\CommentInterface $comment */
     $comment = $this->entity;
     $entity = $comment->getCommentedEntity();
     $field_definition = $this->entityFieldManager->getFieldDefinitions($entity->getEntityTypeId(), $entity->bundle())[$comment->getFieldName()];
@@ -378,9 +382,9 @@ class CommentForm extends ContentEntityForm {
 
       // Add a log entry.
       $logger->notice('Comment posted: %subject.', [
-          '%subject' => $comment->getSubject(),
-          'link' => $this->l(t('View'), $comment->toUrl()->setOption('fragment', 'comment-' . $comment->id())),
-        ]);
+        '%subject' => $comment->getSubject(),
+        'link' => Link::fromTextAndUrl(t('View'), $comment->toUrl()->setOption('fragment', 'comment-' . $comment->id()))->toString(),
+      ]);
 
       // Explain the approval queue if necessary.
       if (!$comment->isPublished()) {

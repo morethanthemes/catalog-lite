@@ -14,12 +14,17 @@ use Drupal\node\Entity\NodeType;
  *
  * @group jsonapi
  */
-class FieldConfigTest extends ResourceTestBase {
+class FieldConfigTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['field', 'node'];
+  protected static $modules = ['field', 'node', 'field_ui'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -114,7 +119,7 @@ class FieldConfigTest extends ResourceTestBase {
           'label' => 'field_llama',
           'langcode' => 'en',
           'required' => FALSE,
-          'settings' => [],
+          'settings' => ['allowed_formats' => []],
           'status' => TRUE,
           'translatable' => TRUE,
           'drupal_internal__id' => 'node.camelids.field_llama',
@@ -128,6 +133,7 @@ class FieldConfigTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
   /**

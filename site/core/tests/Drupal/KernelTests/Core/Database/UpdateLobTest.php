@@ -2,6 +2,8 @@
 
 namespace Drupal\KernelTests\Core\Database;
 
+use Drupal\Component\Render\FormattableMarkup;
+
 /**
  * Tests the Update query builder with LOB fields.
  *
@@ -14,7 +16,7 @@ class UpdateLobTest extends DatabaseTestBase {
    */
   public function testUpdateOneBlob() {
     $data = "This is\000a test.";
-    $this->assertTrue(strlen($data) === 15, 'Test data contains a NULL.');
+    $this->assertSame(15, strlen($data), 'Test data contains a NULL.');
     $id = $this->connection->insert('test_one_blob')
       ->fields(['blob1' => $data])
       ->execute();
@@ -25,8 +27,26 @@ class UpdateLobTest extends DatabaseTestBase {
       ->fields(['blob1' => $data])
       ->execute();
 
-    $r = db_query('SELECT * FROM {test_one_blob} WHERE id = :id', [':id' => $id])->fetchAssoc();
-    $this->assertTrue($r['blob1'] === $data, format_string('Can update a blob: id @id, @data.', ['@id' => $id, '@data' => serialize($r)]));
+    $r = $this->connection->query('SELECT * FROM {test_one_blob} WHERE [id] = :id', [':id' => $id])->fetchAssoc();
+    $this->assertSame($data, $r['blob1'], new FormattableMarkup('Can update a blob: id @id, @data.', ['@id' => $id, '@data' => serialize($r)]));
+  }
+
+  /**
+   * Tests that we can update a blob column to null.
+   */
+  public function testUpdateNullBlob() {
+    $id = $this->connection->insert('test_one_blob')
+      ->fields(['blob1' => 'test'])
+      ->execute();
+    $r = $this->connection->query('SELECT * FROM {test_one_blob} WHERE [id] = :id', [':id' => $id])->fetchAssoc();
+    $this->assertSame('test', $r['blob1']);
+
+    $this->connection->update('test_one_blob')
+      ->fields(['blob1' => NULL])
+      ->condition('id', $id)
+      ->execute();
+    $r = $this->connection->query('SELECT * FROM {test_one_blob} WHERE [id] = :id', [':id' => $id])->fetchAssoc();
+    $this->assertNull($r['blob1']);
   }
 
   /**
@@ -45,8 +65,9 @@ class UpdateLobTest extends DatabaseTestBase {
       ->fields(['blob1' => 'and so', 'blob2' => 'is this'])
       ->execute();
 
-    $r = db_query('SELECT * FROM {test_two_blobs} WHERE id = :id', [':id' => $id])->fetchAssoc();
-    $this->assertTrue($r['blob1'] === 'and so' && $r['blob2'] === 'is this', 'Can update multiple blobs per row.');
+    $r = $this->connection->query('SELECT * FROM {test_two_blobs} WHERE [id] = :id', [':id' => $id])->fetchAssoc();
+    $this->assertSame('and so', $r['blob1']);
+    $this->assertSame('is this', $r['blob2']);
   }
 
 }

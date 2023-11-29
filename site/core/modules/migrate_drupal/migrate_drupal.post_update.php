@@ -2,14 +2,14 @@
 
 /**
  * @file
- * Post update functions for migrate_drupal.
+ * Post update functions for Migrate Drupal.
  */
 
 /**
- * Force MigrateField plugin definitions to be cleared.
- *
- * @see https://www.drupal.org/node/3006470
+ * Implements hook_removed_post_updates().
  */
-function drupal_migrate_post_update_clear_migrate_field_plugin_cache() {
-  // Empty post-update hook.
+function migrate_drupal_removed_post_updates() {
+  return [
+    'migrate_drupal_post_update_uninstall_multilingual' => '10.0.0',
+  ];
 }

@@ -13,12 +13,12 @@ use Drupal\node\Entity\NodeType;
  *
  * @group jsonapi
  */
-class ContentLanguageSettingsTest extends ResourceTestBase {
+class ContentLanguageSettingsTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['language', 'node'];
+  protected static $modules = ['language', 'node'];
 
   /**
    * {@inheritdoc}
@@ -36,6 +36,11 @@ class ContentLanguageSettingsTest extends ResourceTestBase {
    * @var \Drupal\language\ContentLanguageSettingsInterface
    */
   protected $entity;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -111,6 +116,7 @@ class ContentLanguageSettingsTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
   /**

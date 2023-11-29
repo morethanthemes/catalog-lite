@@ -19,7 +19,12 @@ class LayoutDisplayTest extends BrowserTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected $defaultTheme = 'stark';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
     parent::setUp();
 
     $this->createContentType([
@@ -53,11 +58,11 @@ class LayoutDisplayTest extends BrowserTestBase {
     $assert_session->pageTextNotContains('Powered by Drupal');
 
     $this->drupalGet('node/1/layout');
-    $assert_session->linkExists('Add Block');
-    $this->clickLink('Add Block');
+    $assert_session->linkExists('Add block');
+    $this->clickLink('Add block');
     $assert_session->linkExists('Powered by Drupal');
     $this->clickLink('Powered by Drupal');
-    $page->pressButton('Add Block');
+    $page->pressButton('Add block');
     $page->pressButton('Save');
     $assert_session->pageTextContains('Powered by Drupal');
 

@@ -3,6 +3,8 @@
 namespace Drupal\media_library;
 
 use Drupal\Component\Utility\Crypt;
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Site\Settings;
 use Symfony\Component\HttpFoundation\ParameterBag;
 use Symfony\Component\HttpFoundation\Request;
@@ -36,13 +38,8 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
  * with them either.
  *
  * @see \Drupal\media_library\MediaLibraryOpenerInterface
- *
- * @internal
- *   Media Library is an experimental module and its internal code may be
- *   subject to change in minor releases. External code should not instantiate
- *   or extend this class.
  */
-class MediaLibraryState extends ParameterBag {
+class MediaLibraryState extends ParameterBag implements CacheableDependencyInterface {
 
   /**
    * {@inheritdoc}
@@ -71,7 +68,7 @@ class MediaLibraryState extends ParameterBag {
    * @param array $opener_parameters
    *   (optional) Any additional opener-specific parameter values.
    *
-   * @return \Drupal\media_library\MediaLibraryState
+   * @return static
    *   A state object.
    */
   public static function create($opener_id, array $allowed_media_type_ids, $selected_type_id, $remaining_slots, array $opener_parameters = []) {
@@ -91,7 +88,7 @@ class MediaLibraryState extends ParameterBag {
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request.
    *
-   * @return \Drupal\media_library\MediaLibraryState
+   * @return static
    *   A state object.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
@@ -104,10 +101,10 @@ class MediaLibraryState extends ParameterBag {
     // all validation runs.
     $state = static::create(
       $query->get('media_library_opener_id'),
-      $query->get('media_library_allowed_types', []),
+      $query->all('media_library_allowed_types'),
       $query->get('media_library_selected_type'),
       $query->get('media_library_remaining'),
-      $query->get('media_library_opener_parameters', [])
+      $query->all('media_library_opener_parameters')
     );
 
     // The request parameters need to contain a valid hash to prevent a
@@ -207,7 +204,7 @@ class MediaLibraryState extends ParameterBag {
    *   The hashed parameters.
    */
   public function isValidHash($hash) {
-    return Crypt::hashEquals($this->getHash(), $hash);
+    return hash_equals($this->getHash(), $hash);
   }
 
   /**
@@ -227,7 +224,7 @@ class MediaLibraryState extends ParameterBag {
    *   The media type IDs.
    */
   public function getAllowedTypeIds() {
-    return $this->get('media_library_allowed_types');
+    return $this->all('media_library_allowed_types');
   }
 
   /**
@@ -271,7 +268,28 @@ class MediaLibraryState extends ParameterBag {
    *   An associative array of all opener-specific parameter values.
    */
   public function getOpenerParameters() {
-    return $this->get('media_library_opener_parameters', []);
+    return $this->all('media_library_opener_parameters');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    return ['url.query_args'];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheMaxAge() {
+    return Cache::PERMANENT;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTags() {
+    return [];
   }
 
 }

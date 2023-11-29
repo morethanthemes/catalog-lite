@@ -34,7 +34,7 @@ abstract class TaxonomyTestBase extends ViewsKernelTestBase {
    *
    * @var array
    */
-  public static $modules = [
+  protected static $modules = [
     'taxonomy',
     'taxonomy_test_views',
     'text',
@@ -74,18 +74,18 @@ abstract class TaxonomyTestBase extends ViewsKernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp($import_test_views = TRUE) {
+  protected function setUp($import_test_views = TRUE): void {
     parent::setUp($import_test_views);
 
     // Install node config to create body field.
     $this->installEntitySchema('node');
-    $this->installConfig(['node', 'filter']);
+    $this->installConfig(['node', 'filter', 'taxonomy']);
     $this->installEntitySchema('user');
     $this->installEntitySchema('taxonomy_term');
     $this->mockStandardInstall();
 
     if ($import_test_views) {
-      ViewTestData::createTestViews(get_class($this), ['taxonomy_test_views']);
+      ViewTestData::createTestViews(static::class, ['taxonomy_test_views']);
     }
 
     $this->term1 = $this->createTerm();

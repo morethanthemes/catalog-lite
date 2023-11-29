@@ -10,9 +10,12 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\ImageToolkit\ImageToolkitBase;
 use Drupal\Core\ImageToolkit\ImageToolkitOperationManagerInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+use Drupal\Core\StreamWrapper\StreamWrapperManager;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+
+// cspell:ignore rrggbb
 
 /**
  * Defines the GD2 toolkit for image manipulation within Drupal.
@@ -27,7 +30,7 @@ class GDToolkit extends ImageToolkitBase {
   /**
    * A GD image resource.
    *
-   * @var resource|null
+   * @var \GdImage|null
    */
   protected $resource = NULL;
 
@@ -87,25 +90,10 @@ class GDToolkit extends ImageToolkitBase {
    * @param \Drupal\Core\File\FileSystemInterface $file_system
    *   The file system.
    */
-  public function __construct(array $configuration, $plugin_id, array $plugin_definition, ImageToolkitOperationManagerInterface $operation_manager, LoggerInterface $logger, ConfigFactoryInterface $config_factory, StreamWrapperManagerInterface $stream_wrapper_manager, FileSystemInterface $file_system = NULL) {
+  public function __construct(array $configuration, $plugin_id, array $plugin_definition, ImageToolkitOperationManagerInterface $operation_manager, LoggerInterface $logger, ConfigFactoryInterface $config_factory, StreamWrapperManagerInterface $stream_wrapper_manager, FileSystemInterface $file_system) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $operation_manager, $logger, $config_factory);
     $this->streamWrapperManager = $stream_wrapper_manager;
-    if (!$file_system) {
-      @trigger_error('The file_system service must be passed to GDToolkit::__construct(), it is required before Drupal 9.0.0. See https://www.drupal.org/node/3006851.', E_USER_DEPRECATED);
-      $file_system = \Drupal::service('file_system');
-    }
     $this->fileSystem = $file_system;
-  }
-
-  /**
-   * Destructs a GDToolkit object.
-   *
-   * Frees memory associated with a GD image resource.
-   */
-  public function __destruct() {
-    if (is_resource($this->resource)) {
-      imagedestroy($this->resource);
-    }
   }
 
   /**
@@ -127,14 +115,14 @@ class GDToolkit extends ImageToolkitBase {
   /**
    * Sets the GD image resource.
    *
-   * @param resource $resource
+   * @param \GdImage $resource
    *   The GD image resource.
    *
-   * @return \Drupal\system\Plugin\ImageToolkit\GDToolkit
+   * @return $this
    *   An instance of the current toolkit object.
    */
   public function setResource($resource) {
-    if (!is_resource($resource) || get_resource_type($resource) != 'gd') {
+    if (!$resource instanceof \GdImage) {
       throw new \InvalidArgumentException('Invalid resource argument');
     }
     $this->preLoadInfo = NULL;
@@ -145,11 +133,11 @@ class GDToolkit extends ImageToolkitBase {
   /**
    * Retrieves the GD image resource.
    *
-   * @return resource|null
+   * @return \GdImage|null
    *   The GD image resource, or NULL if not available.
    */
   public function getResource() {
-    if (!is_resource($this->resource)) {
+    if (!$this->resource) {
       $this->load();
     }
     return $this->resource;
@@ -161,12 +149,12 @@ class GDToolkit extends ImageToolkitBase {
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     $form['image_jpeg_quality'] = [
       '#type' => 'number',
-      '#title' => t('JPEG quality'),
-      '#description' => t('Define the image quality for JPEG manipulations. Ranges from 0 to 100. Higher values mean better image quality but bigger files.'),
+      '#title' => $this->t('JPEG quality'),
+      '#description' => $this->t('Define the image quality for JPEG manipulations. Ranges from 0 to 100. Higher values mean better image quality but bigger files.'),
       '#min' => 0,
       '#max' => 100,
       '#default_value' => $this->configFactory->getEditable('system.image.gd')->get('jpeg_quality', FALSE),
-      '#field_suffix' => t('%'),
+      '#field_suffix' => $this->t('%'),
     ];
     return $form;
   }
@@ -192,31 +180,54 @@ class GDToolkit extends ImageToolkitBase {
       return FALSE;
     }
 
+    // Invalidate the image object and return if there's no function to load the
+    // image file.
     $function = 'imagecreatefrom' . image_type_to_extension($this->getType(), FALSE);
-    if (function_exists($function) && $resource = $function($this->getSource())) {
-      $this->setResource($resource);
-      if (imageistruecolor($resource)) {
-        return TRUE;
-      }
-      else {
-        // Convert indexed images to truecolor, copying the image to a new
-        // truecolor resource, so that filters work correctly and don't result
-        // in unnecessary dither.
-        $data = [
-          'width' => imagesx($resource),
-          'height' => imagesy($resource),
-          'extension' => image_type_to_extension($this->getType(), FALSE),
-          'transparent_color' => $this->getTransparentColor(),
-          'is_temp' => TRUE,
-        ];
-        if ($this->apply('create_new', $data)) {
-          imagecopy($this->getResource(), $resource, 0, 0, 0, 0, imagesx($resource), imagesy($resource));
-          imagedestroy($resource);
-        }
-      }
-      return (bool) $this->getResource();
+    if (!function_exists($function)) {
+      $this->logger->error("The image toolkit '@toolkit' can not process image '@image'.", [
+        '@toolkit' => $this->getPluginId(),
+        '@image' => $this->getSource(),
+      ]);
+      $this->preLoadInfo = NULL;
+      return FALSE;
     }
-    return FALSE;
+
+    // Invalidate the image object and return if the load fails.
+    try {
+      $resource = $function($this->getSource());
+    }
+    catch (\Throwable $t) {
+      $this->logger->error("The image toolkit '@toolkit' failed loading image '@image'. Reported error: @class - @message", [
+        '@toolkit' => $this->getPluginId(),
+        '@image' => $this->getSource(),
+        '@class' => get_class($t),
+        '@message' => $t->getMessage(),
+      ]);
+      $this->preLoadInfo = NULL;
+      return FALSE;
+    }
+
+    $this->setResource($resource);
+    if (imageistruecolor($resource)) {
+      return TRUE;
+    }
+    else {
+      // Convert indexed images to truecolor, copying the image to a new
+      // truecolor resource, so that filters work correctly and don't result
+      // in unnecessary dither.
+      $data = [
+        'width' => imagesx($resource),
+        'height' => imagesy($resource),
+        'extension' => image_type_to_extension($this->getType(), FALSE),
+        'transparent_color' => $this->getTransparentColor(),
+        'is_temp' => TRUE,
+      ];
+      if ($this->apply('create_new', $data)) {
+        imagecopy($this->getResource(), $resource, 0, 0, 0, 0, imagesx($resource), imagesy($resource));
+        imagedestroy($resource);
+      }
+    }
+    return (bool) $this->getResource();
   }
 
   /**
@@ -230,9 +241,9 @@ class GDToolkit extends ImageToolkitBase {
    * {@inheritdoc}
    */
   public function save($destination) {
-    $scheme = file_uri_scheme($destination);
+    $scheme = StreamWrapperManager::getScheme($destination);
     // Work around lack of stream wrapper support in imagejpeg() and imagepng().
-    if ($scheme && file_stream_wrapper_valid_scheme($scheme)) {
+    if ($scheme && $this->streamWrapperManager->isValidScheme($scheme)) {
       // If destination is not local, save image to temporary local file.
       $local_wrappers = $this->streamWrapperManager->getWrappers(StreamWrapperInterface::LOCAL);
       if (!isset($local_wrappers[$scheme])) {
@@ -248,15 +259,37 @@ class GDToolkit extends ImageToolkitBase {
       return FALSE;
     }
     if ($this->getType() == IMAGETYPE_JPEG) {
-      $success = $function($this->getResource(), $destination, $this->configFactory->get('system.image.gd')->get('jpeg_quality'));
+      try {
+        $success = $function($this->getResource(), $destination, $this->configFactory->get('system.image.gd')->get('jpeg_quality'));
+      }
+      catch (\Throwable $t) {
+        $this->logger->error("The image toolkit '@toolkit' failed saving image '@image'. Reported error: @class - @message", [
+          '@toolkit' => $this->getPluginId(),
+          '@image' => $destination,
+          '@class' => get_class($t),
+          '@message' => $t->getMessage(),
+        ]);
+        $success = FALSE;
+      }
     }
     else {
-      // Always save PNG images with full transparency.
-      if ($this->getType() == IMAGETYPE_PNG) {
+      // Image types that support alpha need to be saved accordingly.
+      if (in_array($this->getType(), [IMAGETYPE_PNG, IMAGETYPE_WEBP], TRUE)) {
         imagealphablending($this->getResource(), FALSE);
         imagesavealpha($this->getResource(), TRUE);
       }
-      $success = $function($this->getResource(), $destination);
+      try {
+        $success = $function($this->getResource(), $destination);
+      }
+      catch (\Throwable $t) {
+        $this->logger->error("The image toolkit '@toolkit' failed saving image '@image'. Reported error: @class - @message", [
+          '@toolkit' => $this->getPluginId(),
+          '@image' => $destination,
+          '@class' => get_class($t),
+          '@message' => $t->getMessage(),
+        ]);
+        $success = FALSE;
+      }
     }
     // Move temporary local file to remote destination.
     if (isset($permanent_destination) && $success) {
@@ -388,14 +421,59 @@ class GDToolkit extends ImageToolkitBase {
 
     $info = gd_info();
     $requirements['version'] = [
-      'title' => t('GD library'),
+      'title' => $this->t('GD library'),
       'value' => $info['GD Version'],
     ];
+
+    // Check if toolkit supported image formats can be actually processed by the
+    // GD library installed with PHP.
+    $check_formats = [
+      IMG_GIF => 'GIF',
+      IMG_JPG => 'JPEG',
+      IMG_PNG => 'PNG',
+      IMG_WEBP => 'WEBP',
+    ];
+    $supported_formats = array_filter($check_formats, fn($type) => imagetypes() & $type, ARRAY_FILTER_USE_KEY);
+    $unsupported_formats = array_diff_key($check_formats, $supported_formats);
+
+    $descriptions = [];
+    if ($supported_formats) {
+      $descriptions[] = $this->formatPlural(
+        count($supported_formats),
+        'Supported image file format: %formats.',
+        'Supported image file formats: %formats.',
+        ['%formats' => implode(', ', $supported_formats)]
+      );
+    }
+    if ($unsupported_formats) {
+      $requirements['version']['severity'] = REQUIREMENT_WARNING;
+      $unsupported = $this->formatPlural(
+        count($unsupported_formats),
+        'Unsupported image file format: %formats.',
+        'Unsupported image file formats: %formats.',
+        ['%formats' => implode(', ', $unsupported_formats)]
+      );
+      $fix_info = $this->t('Check the <a href="https://www.php.net/manual/en/image.installation.php">PHP GD installation documentation</a> if you want to add support.');
+      $descriptions[] = $this->t('@unsupported<br>@ref', [
+        '@unsupported' => $unsupported,
+        '@ref' => $fix_info,
+      ]);
+    }
 
     // Check for filter and rotate support.
     if (!function_exists('imagefilter') || !function_exists('imagerotate')) {
       $requirements['version']['severity'] = REQUIREMENT_WARNING;
-      $requirements['version']['description'] = t('The GD Library for PHP is enabled, but was compiled without support for functions used by the rotate and desaturate effects. It was probably compiled using the official GD libraries from http://www.libgd.org instead of the GD library bundled with PHP. You should recompile PHP --with-gd using the bundled GD library. See <a href="http://php.net/manual/book.image.php">the PHP manual</a>.');
+      $descriptions[] = $this->t('The GD Library for PHP is enabled, but was compiled without support for functions used by the rotate and desaturate effects. It was probably compiled using the official GD libraries from the <a href="https://libgd.github.io/">gdLibrary site</a> instead of the GD library bundled with PHP. You should recompile PHP --with-gd using the bundled GD library. See <a href="https://www.php.net/manual/book.image.php">the PHP manual</a>.');
+    }
+
+    if (count($descriptions) > 1) {
+      $requirements['version']['description'] = [
+        '#theme' => 'item_list',
+        '#items' => $descriptions,
+      ];
+    }
+    else {
+      $requirements['version']['description'] = $descriptions[0];
     }
 
     return $requirements;
@@ -462,7 +540,7 @@ class GDToolkit extends ImageToolkitBase {
    *   IMAGETYPE_* constant (e.g. IMAGETYPE_JPEG, IMAGETYPE_PNG, etc.).
    */
   protected static function supportedTypes() {
-    return [IMAGETYPE_PNG, IMAGETYPE_JPEG, IMAGETYPE_GIF];
+    return [IMAGETYPE_PNG, IMAGETYPE_JPEG, IMAGETYPE_GIF, IMAGETYPE_WEBP];
   }
 
 }

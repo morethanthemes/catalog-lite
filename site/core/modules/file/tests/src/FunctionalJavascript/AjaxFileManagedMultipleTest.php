@@ -23,7 +23,12 @@ class AjaxFileManagedMultipleTest extends WebDriverTestBase {
   protected static $modules = ['file_test', 'file', 'file_module_test'];
 
   /**
-   * Test if managed file form element works well with multiple files upload.
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
+
+  /**
+   * Tests if managed file form element works well with multiple files upload.
    */
   public function testMultipleFilesUpload() {
     $file_system = \Drupal::service('file_system');

@@ -6,6 +6,7 @@ use Drupal\Core\Form\FormState;
 use Drupal\Core\Render\Element\Number;
 use Drupal\Core\Render\Element\Select;
 use Drupal\Core\Render\Element\Weight;
+use Drupal\element_info_test\ElementInfoTestNumberBuilder;
 use Drupal\KernelTests\KernelTestBase;
 
 /**
@@ -22,13 +23,13 @@ class WeightTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->installConfig(['system']);
   }
 
   /**
-   * Test existing #default_value value in #options list.
+   * Tests existing #default_value value in #options list.
    *
    * @covers ::processWeight
    */
@@ -52,7 +53,7 @@ class WeightTest extends KernelTestBase {
   }
 
   /**
-   * Test transformation from "select" to "number" for MAX_DELTA + 1.
+   * Tests transformation from "select" to "number" for MAX_DELTA + 1.
    *
    * @throws \Exception
    *
@@ -117,8 +118,8 @@ class WeightTest extends KernelTestBase {
       '#pre_render' => [
         [Number::class, 'preRenderNumber'],
         // The custom callback is appended.
-        /* @see element_info_test_element_info_alter() */
-        'element_info_test_element_pre_render',
+        /* @see \Drupal\element_info_test\ElementInfoTestNumberBuilder::preRender */
+        [ElementInfoTestNumberBuilder::class, 'preRender'],
       ],
     ]);
   }

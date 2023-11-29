@@ -3,9 +3,12 @@
 namespace Drupal\Core\Datetime\Element;
 
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Utility\Variable;
 use Drupal\Core\Datetime\DateHelper;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Security\DoTrustedCallbackTrait;
+use Drupal\Core\Security\StaticTrustedCallbackHelper;
 
 /**
  * Provides a datelist element.
@@ -14,11 +17,13 @@ use Drupal\Core\Form\FormStateInterface;
  */
 class Datelist extends DateElementBase {
 
+  use DoTrustedCallbackTrait;
+
   /**
    * {@inheritdoc}
    */
   public function getInfo() {
-    $class = get_class($this);
+    $class = static::class;
     return [
       '#input' => TRUE,
       '#element_validate' => [
@@ -33,7 +38,7 @@ class Datelist extends DateElementBase {
       '#date_year_range' => '1900:2050',
       '#date_increment' => 1,
       '#date_date_callbacks' => [],
-      '#date_timezone' => drupal_get_user_timezone(),
+      '#date_timezone' => date_default_timezone_get(),
     ];
   }
 
@@ -149,7 +154,7 @@ class Datelist extends DateElementBase {
    *     minute.
    *   - #date_timezone: The Time Zone Identifier (TZID) to use when displaying
    *     or interpreting dates, i.e: 'Asia/Kolkata'. Defaults to the value
-   *     returned by drupal_get_user_timezone().
+   *     returned by date_default_timezone_get().
    *
    * Example usage:
    * @code
@@ -261,9 +266,8 @@ class Datelist extends DateElementBase {
     // Allows custom callbacks to alter the element.
     if (!empty($element['#date_date_callbacks'])) {
       foreach ($element['#date_date_callbacks'] as $callback) {
-        if (function_exists($callback)) {
-          $callback($element, $form_state, $date);
-        }
+        $message = sprintf('Datelist element #date_date_callbacks callbacks must be methods of a class that implements \Drupal\Core\Security\TrustedCallbackInterface or be an anonymous function. The callback was %s. See https://www.drupal.org/node/3217966', Variable::callableToString($callback));
+        StaticTrustedCallbackHelper::callback($callback, [&$element, $form_state, $date], $message);
       }
     }
 
@@ -338,6 +342,9 @@ class Datelist extends DateElementBase {
    *   Array of keys from the input array that have no value, may be empty.
    */
   protected static function checkEmptyInputs($input, $parts) {
+    // The object key does not represent an input value, see
+    // \Drupal\Core\Datetime\Element\Datelist::valueCallback().
+    unset($input['object']);
     // Filters out empty array values, any valid value would have a string length.
     $filtered_input = array_filter($input, 'strlen');
     return array_diff($parts, array_keys($filtered_input));
@@ -347,9 +354,11 @@ class Datelist extends DateElementBase {
    * Rounds minutes and seconds to nearest requested value.
    *
    * @param $date
+   *   The date.
    * @param $increment
+   *   The value to round to.
    *
-   * @return
+   * @return \Drupal\Core\Datetime\DrupalDateTime
    */
   protected static function incrementRound(&$date, $increment) {
     // Round minutes and seconds, if necessary.

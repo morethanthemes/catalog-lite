@@ -2,7 +2,7 @@
 
 namespace Drupal\Core\Entity;
 
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Reacts to entity type CRUD on behalf of the Entity system.
@@ -28,7 +28,7 @@ class EntityTypeListener implements EntityTypeListenerInterface {
   /**
    * The event dispatcher.
    *
-   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
+   * @var \Symfony\Contracts\EventDispatcher\EventDispatcherInterface
    */
   protected $eventDispatcher;
 
@@ -46,7 +46,7 @@ class EntityTypeListener implements EntityTypeListenerInterface {
    *   The entity type manager.
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entity_field_manager
    *   The entity field manager.
-   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
+   * @param \Symfony\Contracts\EventDispatcher\EventDispatcherInterface $event_dispatcher
    *   The event dispatcher.
    * @param \Drupal\Core\Entity\EntityLastInstalledSchemaRepositoryInterface $entity_last_installed_schema_repository
    *   The entity last installed schema repository.
@@ -71,12 +71,35 @@ class EntityTypeListener implements EntityTypeListenerInterface {
       $storage->onEntityTypeCreate($entity_type);
     }
 
-    $this->eventDispatcher->dispatch(EntityTypeEvents::CREATE, new EntityTypeEvent($entity_type));
-
     $this->entityLastInstalledSchemaRepository->setLastInstalledDefinition($entity_type);
     if ($entity_type->entityClassImplements(FieldableEntityInterface::class)) {
       $this->entityLastInstalledSchemaRepository->setLastInstalledFieldStorageDefinitions($entity_type_id, $this->entityFieldManager->getFieldStorageDefinitions($entity_type_id));
     }
+
+    $this->eventDispatcher->dispatch(new EntityTypeEvent($entity_type), EntityTypeEvents::CREATE);
+    $this->clearCachedDefinitions();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function onFieldableEntityTypeCreate(EntityTypeInterface $entity_type, array $field_storage_definitions) {
+    $entity_type_id = $entity_type->id();
+
+    // @todo Forward this to all interested handlers, not only storage, once
+    //   iterating handlers is possible: https://www.drupal.org/node/2332857.
+    $storage = $this->entityTypeManager->createHandlerInstance($entity_type->getStorageClass(), $entity_type);
+    if ($storage instanceof EntityTypeListenerInterface) {
+      $storage->onFieldableEntityTypeCreate($entity_type, $field_storage_definitions);
+    }
+
+    $this->entityLastInstalledSchemaRepository->setLastInstalledDefinition($entity_type);
+    if ($entity_type->entityClassImplements(FieldableEntityInterface::class)) {
+      $this->entityLastInstalledSchemaRepository->setLastInstalledFieldStorageDefinitions($entity_type_id, $field_storage_definitions);
+    }
+
+    $this->eventDispatcher->dispatch(new EntityTypeEvent($entity_type), EntityTypeEvents::CREATE);
+    $this->clearCachedDefinitions();
   }
 
   /**
@@ -94,9 +117,10 @@ class EntityTypeListener implements EntityTypeListenerInterface {
       $storage->onEntityTypeUpdate($entity_type, $original);
     }
 
-    $this->eventDispatcher->dispatch(EntityTypeEvents::UPDATE, new EntityTypeEvent($entity_type, $original));
-
     $this->entityLastInstalledSchemaRepository->setLastInstalledDefinition($entity_type);
+
+    $this->eventDispatcher->dispatch(new EntityTypeEvent($entity_type, $original), EntityTypeEvents::UPDATE);
+    $this->clearCachedDefinitions();
   }
 
   /**
@@ -116,9 +140,10 @@ class EntityTypeListener implements EntityTypeListenerInterface {
       $storage->onEntityTypeDelete($entity_type);
     }
 
-    $this->eventDispatcher->dispatch(EntityTypeEvents::DELETE, new EntityTypeEvent($entity_type));
-
     $this->entityLastInstalledSchemaRepository->deleteLastInstalledDefinition($entity_type_id);
+
+    $this->eventDispatcher->dispatch(new EntityTypeEvent($entity_type), EntityTypeEvents::DELETE);
+    $this->clearCachedDefinitions();
   }
 
   /**
@@ -135,13 +160,22 @@ class EntityTypeListener implements EntityTypeListenerInterface {
     }
 
     if ($sandbox === NULL || (isset($sandbox['#finished']) && $sandbox['#finished'] == 1)) {
-      $this->eventDispatcher->dispatch(EntityTypeEvents::UPDATE, new EntityTypeEvent($entity_type, $original));
-
       $this->entityLastInstalledSchemaRepository->setLastInstalledDefinition($entity_type);
       if ($entity_type->entityClassImplements(FieldableEntityInterface::class)) {
         $this->entityLastInstalledSchemaRepository->setLastInstalledFieldStorageDefinitions($entity_type_id, $field_storage_definitions);
       }
+
+      $this->eventDispatcher->dispatch(new EntityTypeEvent($entity_type, $original), EntityTypeEvents::UPDATE);
+      $this->clearCachedDefinitions();
     }
+  }
+
+  /**
+   * Clears necessary caches to apply entity/field definition updates.
+   */
+  protected function clearCachedDefinitions() {
+    $this->entityTypeManager->clearCachedDefinitions();
+    $this->entityFieldManager->clearCachedFieldDefinitions();
   }
 
 }

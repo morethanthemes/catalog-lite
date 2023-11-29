@@ -2,7 +2,6 @@
 
 namespace Drupal\user;
 
-use Drupal\Core\DependencyInjection\DeprecatedServicePropertyTrait;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Password\PasswordInterface;
 
@@ -10,12 +9,6 @@ use Drupal\Core\Password\PasswordInterface;
  * Validates user authentication credentials.
  */
 class UserAuth implements UserAuthInterface {
-  use DeprecatedServicePropertyTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $deprecatedProperties = ['entityManager' => 'entity.manager'];
 
   /**
    * The entity type manager.
@@ -47,7 +40,7 @@ class UserAuth implements UserAuthInterface {
   /**
    * {@inheritdoc}
    */
-  public function authenticate($username, $password) {
+  public function authenticate($username, #[\SensitiveParameter] $password) {
     $uid = FALSE;
 
     if (!empty($username) && strlen($password) > 0) {

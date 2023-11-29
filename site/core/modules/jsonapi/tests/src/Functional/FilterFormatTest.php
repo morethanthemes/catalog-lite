@@ -10,12 +10,17 @@ use Drupal\filter\Entity\FilterFormat;
  *
  * @group jsonapi
  */
-class FilterFormatTest extends ResourceTestBase {
+class FilterFormatTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['filter'];
+  protected static $modules = ['filter'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -46,7 +51,7 @@ class FilterFormatTest extends ResourceTestBase {
    */
   protected function createEntity() {
     $pablo_format = FilterFormat::create([
-      'name' => 'Pablo Piccasso',
+      'name' => 'Pablo Picasso',
       'format' => 'pablo',
       'langcode' => 'es',
       'filters' => [
@@ -101,7 +106,7 @@ class FilterFormatTest extends ResourceTestBase {
             ],
           ],
           'langcode' => 'es',
-          'name' => 'Pablo Piccasso',
+          'name' => 'Pablo Picasso',
           'status' => TRUE,
           'weight' => 0,
           'drupal_internal__format' => 'pablo',
@@ -115,6 +120,7 @@ class FilterFormatTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
 }

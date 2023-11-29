@@ -20,11 +20,18 @@ class DateFormatTest extends WebDriverTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected $defaultTheme = 'stark';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
     parent::setUp();
 
     // Create admin user and log in admin user.
-    $this->drupalLogin($this->drupalCreateUser(['administer site configuration']));
+    $this->drupalLogin($this->drupalCreateUser([
+      'administer site configuration',
+    ]));
     $this->drupalPlaceBlock('local_actions_block');
   }
 

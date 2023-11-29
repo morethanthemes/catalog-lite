@@ -75,13 +75,12 @@ abstract class FileMediaFormatterBase extends FileFormatterBase implements FileM
     if (!parent::isApplicable($field_definition)) {
       return FALSE;
     }
-    /** @var \Symfony\Component\HttpFoundation\File\MimeType\MimeTypeGuesserInterface $extension_mime_type_guesser */
+    /** @var \Symfony\Component\Mime\MimeTypeGuesserInterface $extension_mime_type_guesser */
     $extension_mime_type_guesser = \Drupal::service('file.mime_type.guesser.extension');
     $extension_list = array_filter(preg_split('/\s+/', $field_definition->getSetting('file_extensions')));
 
     foreach ($extension_list as $extension) {
-      $mime_type = $extension_mime_type_guesser->guess('fakedFile.' . $extension);
-
+      $mime_type = $extension_mime_type_guesser->guessMimeType('fakedFile.' . $extension);
       if (static::mimeTypeApplies($mime_type)) {
         return TRUE;
       }
@@ -169,7 +168,7 @@ abstract class FileMediaFormatterBase extends FileFormatterBase implements FileM
    *   TRUE if the MIME type applies, FALSE otherwise.
    */
   protected static function mimeTypeApplies($mime_type) {
-    list($type) = explode('/', $mime_type, 2);
+    [$type] = explode('/', $mime_type, 2);
     return $type === static::getMediaType();
   }
 

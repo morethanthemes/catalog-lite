@@ -1,0 +1,12 @@
+name: Media Embed text editor plugin test
+description: 'Provides functionality to test embedding media items in text editors.'
+type: module
+package: Testing
+# version: VERSION
+dependencies:
+  - drupal:media
+
+# Information added by Drupal.org packaging script on 2023-11-01
+version: '10.1.6'
+project: 'drupal'
+datestamp: 1698841355

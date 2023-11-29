@@ -20,12 +20,13 @@ use Twig\Parser;
  */
 abstract class AbstractTokenParser implements TokenParserInterface
 {
+    /**
+     * @var Parser
+     */
     protected $parser;
 
-    public function setParser(Parser $parser)
+    public function setParser(Parser $parser): void
     {
         $this->parser = $parser;
     }
 }
-
-class_alias('Twig\TokenParser\AbstractTokenParser', 'Twig_TokenParser');

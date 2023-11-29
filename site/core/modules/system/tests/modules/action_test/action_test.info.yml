@@ -3,9 +3,8 @@ type: module
 description: 'Support module for action testing.'
 package: Testing
 # version: VERSION
-core: 8.x
 
-# Information added by Drupal.org packaging script on 2019-10-02
-version: '8.7.8'
+# Information added by Drupal.org packaging script on 2023-11-01
+version: '10.1.6'
 project: 'drupal'
-datestamp: 1570044520
+datestamp: 1698841355

@@ -17,12 +17,12 @@ class MigrateFileTest extends MigrateDrupal7TestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['file'];
+  protected static $modules = ['file'];
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->fileMigrationSetup();
   }
@@ -43,7 +43,7 @@ class MigrateFileTest extends MigrateDrupal7TestBase {
    * Tests that all expected files are migrated.
    */
   public function testFileMigration() {
-    $this->assertEntity(1, 'cube.jpeg', 'public://cube.jpeg', 'image/jpeg', '3620', '1421727515', '1421727515', '1');
+    $this->assertEntity(1, 'cube.jpeg', 'public://cube.jpeg', 'image/jpeg', 3620, 1421727515, 1421727515, '1');
     // Ensure temporary file was not migrated.
     $this->assertNull(File::load(4));
   }

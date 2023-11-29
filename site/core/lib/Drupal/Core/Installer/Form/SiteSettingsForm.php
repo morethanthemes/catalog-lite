@@ -4,9 +4,12 @@ namespace Drupal\Core\Installer\Form;
 
 use Drupal\Component\Utility\Crypt;
 use Drupal\Core\Database\Database;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\RendererInterface;
+use Drupal\Core\Site\Settings;
+use Drupal\Core\Site\SettingsEditor;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -35,6 +38,8 @@ class SiteSettingsForm extends FormBase {
    *
    * @param string $site_path
    *   The site path.
+   * @param \Drupal\Core\Render\RendererInterface $renderer
+   *   The renderer.
    */
   public function __construct($site_path, RendererInterface $renderer) {
     $this->sitePath = $site_path;
@@ -42,11 +47,11 @@ class SiteSettingsForm extends FormBase {
   }
 
   /**
-    * {@inheritdoc}
-    */
+   * {@inheritdoc}
+   */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('site.path'),
+      $container->getParameter('site.path'),
       $container->get('renderer')
     );
   }
@@ -62,6 +67,8 @@ class SiteSettingsForm extends FormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
+    // Make sure the install API is available.
+    include_once DRUPAL_ROOT . '/core/includes/install.inc';
     $settings_file = './' . $this->sitePath . '/settings.php';
 
     $form['#title'] = $this->t('Database configuration');
@@ -150,6 +157,9 @@ class SiteSettingsForm extends FormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
+    // Make sure the install API is available.
+    include_once DRUPAL_ROOT . '/core/includes/install.inc';
+
     $driver = $form_state->getValue('driver');
     $database = $form_state->getValue($driver);
     $drivers = drupal_get_database_types();
@@ -158,6 +168,10 @@ class SiteSettingsForm extends FormBase {
     // Cut the trailing \Install from namespace.
     $database['namespace'] = substr($install_namespace, 0, strrpos($install_namespace, '\\'));
     $database['driver'] = $driver;
+    // See default.settings.php for an explanation of the 'autoload' key.
+    if ($autoload = Database::findDriverAutoloadDirectory($database['namespace'], DRUPAL_ROOT)) {
+      $database['autoload'] = $autoload;
+    }
 
     $form_state->set('database', $database);
     foreach ($this->getDatabaseErrors($database, $form_state->getValue('settings_file')) as $name => $message) {
@@ -188,16 +202,7 @@ class SiteSettingsForm extends FormBase {
     $errors = array_diff_key($errors, $form_errors);
 
     if (count($errors)) {
-      $error_message = [
-        '#type' => 'inline_template',
-        '#template' => '{% trans %}Resolve all issues below to continue the installation. For help configuring your database server, see the <a href="https://www.drupal.org/docs/8/install">installation handbook</a>, or contact your hosting provider.{% endtrans%}{{ errors }}',
-        '#context' => [
-          'errors' => [
-            '#theme' => 'item_list',
-            '#items' => $errors,
-          ],
-        ],
-      ];
+      $error_message = static::getDatabaseErrorsTemplate($errors);
 
       // These are generic errors, so we do not have any specific key of the
       // database connection array to attach them to; therefore, we just put
@@ -209,10 +214,35 @@ class SiteSettingsForm extends FormBase {
   }
 
   /**
+   * Gets the inline template render array to display the database errors.
+   *
+   * @param \Drupal\Core\StringTranslation\TranslatableMarkup[] $errors
+   *   The database errors to list.
+   *
+   * @return mixed[]
+   *   The inline template render array to display the database errors.
+   */
+  public static function getDatabaseErrorsTemplate(array $errors) {
+    return [
+      '#type' => 'inline_template',
+      '#template' => '{% trans %}Resolve all issues below to continue the installation. For help configuring your database server, see the <a href="https://www.drupal.org/docs/installing-drupal">installation handbook</a>, or contact your hosting provider.{% endtrans %}{{ errors }}',
+      '#context' => [
+        'errors' => [
+          '#theme' => 'item_list',
+          '#items' => $errors,
+        ],
+      ],
+    ];
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     global $install_state;
+
+    // Make sure the install API is available.
+    include_once DRUPAL_ROOT . '/core/includes/install.inc';
 
     // Update global settings array and save.
     $settings = [];
@@ -225,11 +255,25 @@ class SiteSettingsForm extends FormBase {
       'value'    => Crypt::randomBytesBase64(55),
       'required' => TRUE,
     ];
+    // If settings.php does not contain a config sync directory name we need to
+    // configure one.
+    if (empty(Settings::get('config_sync_directory'))) {
+      if (empty($install_state['config_install_path'])) {
+        // Add a randomized config directory name to settings.php
+        $config_sync_directory = $this->createRandomConfigDirectory();
+      }
+      else {
+        // Install profiles can contain a config sync directory. If they do,
+        // 'config_install_path' is a path to the directory.
+        $config_sync_directory = $install_state['config_install_path'];
+      }
+      $settings['settings']['config_sync_directory'] = (object) [
+        'value' => $config_sync_directory,
+        'required' => TRUE,
+      ];
+    }
 
-    drupal_rewrite_settings($settings);
-
-    // Add the config directories to settings.php.
-    drupal_install_config_directories();
+    SettingsEditor::rewrite($this->sitePath . '/settings.php', $settings);
 
     // Indicate that the settings file has been verified, and check the database
     // for the last completed task, now that we have a valid connection. This
@@ -239,6 +283,28 @@ class SiteSettingsForm extends FormBase {
     $install_state['config_verified'] = TRUE;
     $install_state['database_verified'] = TRUE;
     $install_state['completed_task'] = install_verify_completed_task();
+  }
+
+  /**
+   * Create a random config sync directory.
+   *
+   * @return string
+   *   The path to the generated config sync directory.
+   */
+  protected function createRandomConfigDirectory() {
+    $config_sync_directory = $this->sitePath . '/files/config_' . Crypt::randomBytesBase64(55) . '/sync';
+    // This should never fail, it is created here inside the public files
+    // directory, which has already been verified to be writable itself.
+    if (\Drupal::service('file_system')->prepareDirectory($config_sync_directory, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS)) {
+      // Put a README.txt into the sync config directory. This is required so
+      // that they can later be added to git. Since this directory is
+      // auto-created, we have to write out the README rather than just adding
+      // it to the drupal core repo.
+      $text = 'This directory contains configuration to be imported into your Drupal site. To make this configuration active, visit admin/config/development/configuration/sync.' . ' For information about deploying configuration between servers, see https://www.drupal.org/documentation/administer/config';
+      file_put_contents($config_sync_directory . '/README.txt', $text);
+    }
+
+    return $config_sync_directory;
   }
 
 }

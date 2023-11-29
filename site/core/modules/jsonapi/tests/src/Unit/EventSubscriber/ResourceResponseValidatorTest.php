@@ -2,7 +2,6 @@
 
 namespace Drupal\Tests\jsonapi\Unit\EventSubscriber;
 
-use Drupal\jsonapi\Encoder\JsonEncoder;
 use Drupal\jsonapi\EventSubscriber\ResourceResponseValidator;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\Routing\Routes;
@@ -13,9 +12,8 @@ use Drupal\rest\ResourceResponse;
 use Drupal\Tests\UnitTestCase;
 use Prophecy\Argument;
 use Psr\Log\LoggerInterface;
-use Symfony\Cmf\Component\Routing\RouteObjectInterface;
+use Drupal\Core\Routing\RouteObjectInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Serializer\Serializer;
 
 /**
  * @coversDefaultClass \Drupal\jsonapi\EventSubscriber\ResourceResponseValidator
@@ -35,7 +33,7 @@ class ResourceResponseValidatorTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     // Check that the validation class is available.
     if (!class_exists("\\JsonSchema\\Validator")) {
@@ -44,15 +42,10 @@ class ResourceResponseValidatorTest extends UnitTestCase {
 
     $module_handler = $this->prophesize(ModuleHandlerInterface::class);
     $module = $this->prophesize(Extension::class);
-    $module_path = dirname(dirname(dirname(dirname(__DIR__))));
+    $module_path = dirname(__DIR__, 4);
     $module->getPath()->willReturn($module_path);
     $module_handler->getModule('jsonapi')->willReturn($module->reveal());
-    $encoders = [new JsonEncoder()];
-    if (class_exists(JsonSchemaEncoder::class)) {
-      $encoders[] = new JsonSchemaEncoder();
-    }
     $subscriber = new ResourceResponseValidator(
-      new Serializer([], $encoders),
       $this->prophesize(LoggerInterface::class)->reveal(),
       $module_handler->reveal(),
       ''
@@ -110,7 +103,6 @@ class ResourceResponseValidatorTest extends UnitTestCase {
     // Expose protected ResourceResponseSubscriber::validateResponse() method.
     $object = new \ReflectionObject($this->subscriber);
     $method = $object->getMethod('validateResponse');
-    $method->setAccessible(TRUE);
 
     $this->assertSame($expected, $method->invoke($this->subscriber, $response, $request), $description);
   }
@@ -197,10 +189,10 @@ EOD
     ];
 
     $test_cases = array_map(function ($input) use ($defaults) {
-      list($json, $expected, $description, $route_name, $resource_type) = array_values($input + $defaults);
+      [$json, $expected, $description, $route_name, $resource_type] = array_values($input + $defaults);
       return [
-        $this->createRequest($route_name, $resource_type),
-        $this->createResponse($json),
+        static::createRequest($route_name, $resource_type),
+        static::createResponse($json),
         $expected,
         $description,
       ];
@@ -220,7 +212,7 @@ EOD
    * @return \Symfony\Component\HttpFoundation\Request
    *   The mock request object.
    */
-  protected function createRequest($route_name, ResourceType $resource_type) {
+  protected static function createRequest(string $route_name, ResourceType $resource_type): Request {
     $request = new Request();
     $request->attributes->set(RouteObjectInterface::ROUTE_NAME, $route_name);
     $request->attributes->set(Routes::RESOURCE_TYPE_KEY, $resource_type);
@@ -236,7 +228,7 @@ EOD
    * @return \Drupal\rest\ResourceResponse
    *   The mock response object.
    */
-  protected function createResponse($json = NULL) {
+  protected static function createResponse(?string $json = NULL): ResourceResponse {
     $response = new ResourceResponse();
     if ($json) {
       $response->setContent($json);

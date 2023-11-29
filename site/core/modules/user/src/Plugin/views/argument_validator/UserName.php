@@ -68,8 +68,8 @@ class UserName extends User {
    * {@inheritdoc}
    */
   public function processSummaryArguments(&$args) {
-    // If the validation says the input is an username, we should reverse the
-    // argument so it works for example for generation summary urls.
+    // If the validation says the input is a username, we should reverse the
+    // argument so it works for example for generation summary URLs.
     $uids_arg_keys = array_flip($args);
 
     foreach ($this->userStorage->loadMultiple($args) as $uid => $account) {

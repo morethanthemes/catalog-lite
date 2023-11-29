@@ -2,19 +2,20 @@
 
 namespace Drupal\Tests;
 
-use Drupal\Tests\Traits\ExpectDeprecationTrait;
+use PHPUnit\Framework\TestCase;
+use Symfony\Bridge\PhpUnit\ExpectDeprecationTrait;
 
 /**
- * @coversDefaultClass \Drupal\Tests\Traits\ExpectDeprecationTrait
+ * Ensures Drupal has test coverage of Symfony's deprecation testing.
  *
  * @group Test
  * @group legacy
  */
-class ExpectDeprecationTest extends UnitTestCase {
+class ExpectDeprecationTest extends TestCase {
   use ExpectDeprecationTrait;
 
   /**
-   * @covers ::expectDeprecation
+   * Tests expectDeprecation.
    */
   public function testExpectDeprecation() {
     $this->expectDeprecation('Test deprecation');
@@ -22,15 +23,14 @@ class ExpectDeprecationTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::expectDeprecation
+   * Tests expectDeprecation in isolated test.
+   *
    * @runInSeparateProcess
    * @preserveGlobalState disabled
    */
   public function testExpectDeprecationInIsolation() {
     $this->expectDeprecation('Test isolated deprecation');
-    $this->expectDeprecation('Test isolated deprecation2');
     @trigger_error('Test isolated deprecation', E_USER_DEPRECATED);
-    @trigger_error('Test isolated deprecation2', E_USER_DEPRECATED);
   }
 
 }

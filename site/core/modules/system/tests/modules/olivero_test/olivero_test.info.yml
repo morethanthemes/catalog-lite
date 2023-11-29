@@ -1,0 +1,20 @@
+name: 'Olivero tests'
+type: module
+description: 'Support module for testing the Olivero theme.'
+package: Testing
+# version: VERSION
+dependencies:
+  - drupal:comment
+  - drupal:contact
+  - drupal:form_test
+  - drupal:image
+  - drupal:path
+  - drupal:search
+  - drupal:taxonomy
+  - drupal:views
+  - drupal:js_message_test
+
+# Information added by Drupal.org packaging script on 2023-11-01
+version: '10.1.6'
+project: 'drupal'
+datestamp: 1698841355

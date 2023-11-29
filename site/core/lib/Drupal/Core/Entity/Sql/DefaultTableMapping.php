@@ -54,8 +54,9 @@ class DefaultTableMapping implements TableMappingInterface {
   protected $dataTable;
 
   /**
-   * The table that stores revision field data if the entity supports revisions
-   * and has multilingual support.
+   * The table that stores revision field data.
+   *
+   * Only used if the entity supports revisions and has multilingual support.
    *
    * @var string
    */
@@ -397,6 +398,15 @@ class DefaultTableMapping implements TableMappingInterface {
   /**
    * {@inheritdoc}
    */
+  public function getAllFieldTableNames($field_name) {
+    return array_keys(array_filter($this->fieldNames, function ($table_fields) use ($field_name) {
+      return in_array($field_name, $table_fields, TRUE);
+    }));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function getColumnNames($field_name) {
     if (!isset($this->columnMapping[$field_name])) {
       $this->columnMapping[$field_name] = [];
@@ -443,9 +453,10 @@ class DefaultTableMapping implements TableMappingInterface {
    *
    * @return $this
    *
-   * @deprecated in Drupal 8.6.0 and will be changed to a protected method
-   *   before Drupal 9.0.0. There will be no replacement for it because the
-   *   default table mapping is now able to be initialized on its own.
+   * @internal
+   *
+   * @todo Make this method protected in drupal:9.0.0.
+   * @see https://www.drupal.org/node/3067336
    */
   public function setFieldNames($table_name, array $field_names) {
     $this->fieldNames[$table_name] = $field_names;
@@ -465,7 +476,7 @@ class DefaultTableMapping implements TableMappingInterface {
   }
 
   /**
-   * Adds a extra columns for a table to the table mapping.
+   * Adds extra columns for a table to the table mapping.
    *
    * @param string $table_name
    *   The name of table to add the extra columns for.
@@ -474,9 +485,10 @@ class DefaultTableMapping implements TableMappingInterface {
    *
    * @return $this
    *
-   * @deprecated in Drupal 8.6.0 and will be changed to a protected method
-   *   before Drupal 9.0.0. There will be no replacement for it because the
-   *   default table mapping is now able to be initialized on its own.
+   * @internal
+   *
+   * @todo Make this method protected in drupal:9.0.0.
+   * @see https://www.drupal.org/node/3067336
    */
   public function setExtraColumns($table_name, array $column_names) {
     $this->extraColumns[$table_name] = $column_names;

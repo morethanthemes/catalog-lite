@@ -9,9 +9,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\Component\Serializer\SerializerInterface;
 
 /**
  * Response subscriber that validates a JSON:API response.
@@ -21,19 +20,12 @@ use Symfony\Component\Serializer\SerializerInterface;
  * @internal JSON:API maintains no PHP API. The API is the HTTP API. This class
  *   may change at any time and could break any dependencies on it.
  *
- * @see https://www.drupal.org/project/jsonapi/issues/3032787
+ * @see https://www.drupal.org/project/drupal/issues/3032787
  * @see jsonapi.api.php
  *
  * @see \Drupal\rest\EventSubscriber\ResourceResponseSubscriber
  */
 class ResourceResponseValidator implements EventSubscriberInterface {
-
-  /**
-   * The serializer.
-   *
-   * @var \Symfony\Component\Serializer\SerializerInterface
-   */
-  protected $serializer;
 
   /**
    * The JSON:API logger channel.
@@ -68,8 +60,6 @@ class ResourceResponseValidator implements EventSubscriberInterface {
   /**
    * Constructs a ResourceResponseValidator object.
    *
-   * @param \Symfony\Component\Serializer\SerializerInterface $serializer
-   *   The serializer.
    * @param \Psr\Log\LoggerInterface $logger
    *   The JSON:API logger channel.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
@@ -77,8 +67,7 @@ class ResourceResponseValidator implements EventSubscriberInterface {
    * @param string $app_root
    *   The application's root file path.
    */
-  public function __construct(SerializerInterface $serializer, LoggerInterface $logger, ModuleHandlerInterface $module_handler, $app_root) {
-    $this->serializer = $serializer;
+  public function __construct(LoggerInterface $logger, ModuleHandlerInterface $module_handler, $app_root) {
     $this->logger = $logger;
     $this->moduleHandler = $module_handler;
     $this->appRoot = $app_root;
@@ -87,7 +76,7 @@ class ResourceResponseValidator implements EventSubscriberInterface {
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
     $events[KernelEvents::RESPONSE][] = ['onResponse'];
     return $events;
   }
@@ -107,12 +96,12 @@ class ResourceResponseValidator implements EventSubscriberInterface {
   /**
    * Validates JSON:API responses.
    *
-   * @param \Symfony\Component\HttpKernel\Event\FilterResponseEvent $event
+   * @param \Symfony\Component\HttpKernel\Event\ResponseEvent $event
    *   The event to process.
    */
-  public function onResponse(FilterResponseEvent $event) {
+  public function onResponse(ResponseEvent $event) {
     $response = $event->getResponse();
-    if (strpos($response->headers->get('Content-Type'), 'application/vnd.api+json') === FALSE) {
+    if (!str_contains($response->headers->get('Content-Type', ''), 'application/vnd.api+json')) {
       return;
     }
 
@@ -125,9 +114,7 @@ class ResourceResponseValidator implements EventSubscriberInterface {
    * @see self::validateResponse
    */
   public function doValidateResponse(Response $response, Request $request) {
-    if (PHP_MAJOR_VERSION >= 7 || assert_options(ASSERT_ACTIVE)) {
-      assert($this->validateResponse($response, $request), 'A JSON:API response failed validation (see the logs for details). Please report this in the issue queue on drupal.org');
-    }
+    assert($this->validateResponse($response, $request), 'A JSON:API response failed validation (see the logs for details). Please report this in the issue queue on drupal.org');
   }
 
   /**

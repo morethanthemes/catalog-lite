@@ -14,18 +14,18 @@ use Drupal\Tests\UnitTestCase;
 class YamlTest extends UnitTestCase {
 
   /**
-   * Test that the overridden serializer is called.
+   * Tests that the overridden serializer is called.
    *
    * @covers ::getSerializer
    * @runInSeparateProcess
    */
-  public function testGetSeralization() {
+  public function testGetSerialization() {
     new Settings(['yaml_parser_class' => YamlParserProxy::class]);
 
     $this->assertEquals(YamlParserProxy::class, Settings::get('yaml_parser_class'));
 
-    $mock = $this->getMockBuilder('\stdClass')
-      ->setMethods(['encode', 'decode', 'getFileExtension'])
+    $mock = $this->getMockBuilder(YamlTestMockInterface::class)
+      ->onlyMethods(['decode'])
       ->getMock();
     $mock
       ->expects($this->once())
@@ -60,5 +60,17 @@ class YamlParserProxy implements SerializationInterface {
   public static function getFileExtension() {
     return static::$mock->getFileExtension();
   }
+
+}
+
+/**
+ * Interface used in the mocking process of this test.
+ */
+interface YamlTestMockInterface {
+
+  /**
+   * Function used in the mocking process of this test.
+   */
+  public function decode();
 
 }

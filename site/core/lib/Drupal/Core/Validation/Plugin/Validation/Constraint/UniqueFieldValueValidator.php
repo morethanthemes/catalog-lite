@@ -23,7 +23,8 @@ class UniqueFieldValueValidator extends ConstraintValidator {
     $entity_type_id = $entity->getEntityTypeId();
     $id_key = $entity->getEntityType()->getKey('id');
 
-    $query = \Drupal::entityQuery($entity_type_id);
+    $query = \Drupal::entityQuery($entity_type_id)
+      ->accessCheck(FALSE);
 
     $entity_id = $entity->id();
     // Using isset() instead of !empty() as 0 and '0' are valid ID values for
@@ -41,8 +42,8 @@ class UniqueFieldValueValidator extends ConstraintValidator {
     if ($value_taken) {
       $this->context->addViolation($constraint->message, [
         '%value' => $item->value,
-        '@entity_type' => $entity->getEntityType()->getLowercaseLabel(),
-        '@field_name' => mb_strtolower($items->getFieldDefinition()->getLabel()),
+        '@entity_type' => $entity->getEntityType()->getSingularLabel(),
+        '@field_name' => $items->getFieldDefinition()->getLabel(),
       ]);
     }
   }

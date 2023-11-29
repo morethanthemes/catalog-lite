@@ -17,7 +17,6 @@ use Drupal\layout_builder\SectionStorage\SectionStorageDefinition;
 use Drupal\layout_builder\SectionStorage\SectionStorageManager;
 use Drupal\layout_builder\SectionStorageInterface;
 use Drupal\Tests\UnitTestCase;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * @coversDefaultClass \Drupal\layout_builder\SectionStorage\SectionStorageManager
@@ -64,7 +63,7 @@ class SectionStorageManagerTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $cache = $this->prophesize(CacheBackendInterface::class);
@@ -74,32 +73,13 @@ class SectionStorageManagerTest extends UnitTestCase {
 
     $this->discovery = $this->prophesize(DiscoveryInterface::class);
     $reflection_property = new \ReflectionProperty($this->manager, 'discovery');
-    $reflection_property->setAccessible(TRUE);
     $reflection_property->setValue($this->manager, $this->discovery->reveal());
 
     $this->plugin = $this->prophesize(SectionStorageInterface::class);
     $this->factory = $this->prophesize(FactoryInterface::class);
     $this->factory->createInstance('the_plugin_id', [])->willReturn($this->plugin->reveal());
     $reflection_property = new \ReflectionProperty($this->manager, 'factory');
-    $reflection_property->setAccessible(TRUE);
     $reflection_property->setValue($this->manager, $this->factory->reveal());
-  }
-
-  /**
-   * @covers ::__construct
-   *
-   * @expectedDeprecation The context.handler service must be passed to \Drupal\layout_builder\SectionStorage\SectionStorageManager::__construct(); it was added in Drupal 8.7.0 and will be required before Drupal 9.0.0.
-   *
-   * @group legacy
-   */
-  public function testConstructNoContextHandler() {
-    $cache = $this->prophesize(CacheBackendInterface::class);
-    $module_handler = $this->prophesize(ModuleHandlerInterface::class);
-
-    $container = $this->prophesize(ContainerInterface::class);
-    $container->get('context.handler')->shouldBeCalled();
-    \Drupal::setContainer($container->reveal());
-    new SectionStorageManager(new \ArrayObject(), $cache->reveal(), $module_handler->reveal());
   }
 
   /**
@@ -109,46 +89,6 @@ class SectionStorageManagerTest extends UnitTestCase {
     $result = $this->manager->loadEmpty('the_plugin_id');
     $this->assertInstanceOf(SectionStorageInterface::class, $result);
     $this->assertSame($this->plugin->reveal(), $result);
-  }
-
-  /**
-   * @covers ::loadFromStorageId
-   *
-   * @expectedDeprecation \Drupal\layout_builder\SectionStorage\SectionStorageManagerInterface::loadFromStorageId() is deprecated in Drupal 8.7.0 and will be removed before Drupal 9.0.0. \Drupal\layout_builder\SectionStorage\SectionStorageManagerInterface::load() should be used instead. See https://www.drupal.org/node/3012353.
-   *
-   * @group legacy
-   */
-  public function testLoadFromStorageId() {
-    $this->plugin->deriveContextsFromRoute('the_storage_id', [], '', [])->willReturn([]);
-
-    $result = $this->manager->loadFromStorageId('the_plugin_id', 'the_storage_id');
-    $this->assertInstanceOf(SectionStorageInterface::class, $result);
-  }
-
-  /**
-   * @covers ::loadFromRoute
-   *
-   * @expectedDeprecation \Drupal\layout_builder\SectionStorage\SectionStorageManagerInterface::loadFromRoute() is deprecated in Drupal 8.7.0 and will be removed before Drupal 9.0.0. \Drupal\layout_builder\SectionStorageInterface::deriveContextsFromRoute() and \Drupal\layout_builder\SectionStorage\SectionStorageManagerInterface::load() should be used instead. See https://www.drupal.org/node/3012353.
-   *
-   * @group legacy
-   */
-  public function testLoadFromRoute() {
-    $this->plugin->deriveContextsFromRoute('the_value', [], 'the_parameter_name', [])->willReturn([]);
-    $result = $this->manager->loadFromRoute('the_plugin_id', 'the_value', [], 'the_parameter_name', []);
-    $this->assertInstanceOf(SectionStorageInterface::class, $result);
-  }
-
-  /**
-   * @covers ::loadFromRoute
-   *
-   * @expectedDeprecation \Drupal\layout_builder\SectionStorage\SectionStorageManagerInterface::loadFromRoute() is deprecated in Drupal 8.7.0 and will be removed before Drupal 9.0.0. \Drupal\layout_builder\SectionStorageInterface::deriveContextsFromRoute() and \Drupal\layout_builder\SectionStorage\SectionStorageManagerInterface::load() should be used instead. See https://www.drupal.org/node/3012353.
-   *
-   * @group legacy
-   */
-  public function testLoadFromRouteNull() {
-    $this->plugin->deriveContextsFromRoute('the_value', [], 'the_parameter_name', ['_route' => 'the_route_name'])->willReturn([]);
-    $result = $this->manager->loadFromRoute('the_plugin_id', 'the_value', [], 'the_parameter_name', ['_route' => 'the_route_name']);
-    $this->assertInstanceOf(SectionStorageInterface::class, $result);
   }
 
   /**
@@ -184,10 +124,10 @@ class SectionStorageManagerTest extends UnitTestCase {
    */
   public function testFindDefinitions() {
     $this->discovery->getDefinitions()->willReturn([
-      'plugin1' => new SectionStorageDefinition(),
-      'plugin2' => new SectionStorageDefinition(['weight' => -5]),
-      'plugin3' => new SectionStorageDefinition(['weight' => -5]),
-      'plugin4' => new SectionStorageDefinition(['weight' => 10]),
+      'plugin1' => (new SectionStorageDefinition())->setClass(SectionStorageInterface::class),
+      'plugin2' => (new SectionStorageDefinition(['weight' => -5]))->setClass(SectionStorageInterface::class),
+      'plugin3' => (new SectionStorageDefinition(['weight' => -5]))->setClass(SectionStorageInterface::class),
+      'plugin4' => (new SectionStorageDefinition(['weight' => 10]))->setClass(SectionStorageInterface::class),
     ]);
 
     $expected = [
@@ -214,9 +154,9 @@ class SectionStorageManagerTest extends UnitTestCase {
       'foo' => new Context(new ContextDefinition('foo')),
     ];
     $definitions = [
-      'no_access' => new SectionStorageDefinition(),
-      'missing_contexts' => new SectionStorageDefinition(),
-      'provider_access' => new SectionStorageDefinition(),
+      'no_access' => (new SectionStorageDefinition())->setClass(SectionStorageInterface::class),
+      'missing_contexts' => (new SectionStorageDefinition())->setClass(SectionStorageInterface::class),
+      'provider_access' => (new SectionStorageDefinition())->setClass(SectionStorageInterface::class),
     ];
     $this->discovery->getDefinitions()->willReturn($definitions);
 
@@ -269,8 +209,8 @@ class SectionStorageManagerTest extends UnitTestCase {
     ];
 
     $definitions = [
-      'first' => new SectionStorageDefinition(),
-      'second' => new SectionStorageDefinition(),
+      'first' => (new SectionStorageDefinition())->setClass(SectionStorageInterface::class),
+      'second' => (new SectionStorageDefinition())->setClass(SectionStorageInterface::class),
     ];
     $this->discovery->getDefinitions()->willReturn($definitions);
 

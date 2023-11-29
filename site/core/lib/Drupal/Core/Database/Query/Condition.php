@@ -61,6 +61,8 @@ class Condition implements ConditionInterface, \Countable {
 
   /**
    * The identifier of the query placeholder this condition has been compiled against.
+   *
+   * @var string
    */
   protected $queryPlaceholderIdentifier;
 
@@ -88,6 +90,7 @@ class Condition implements ConditionInterface, \Countable {
    * size of its conditional array minus one, because one element is the
    * conjunction.
    */
+  #[\ReturnTypeWillChange]
   public function count() {
     return count($this->conditions) - 1;
   }
@@ -101,6 +104,16 @@ class Condition implements ConditionInterface, \Countable {
     }
     if (empty($value) && is_array($value)) {
       throw new InvalidQueryException(sprintf("Query condition '%s %s ()' cannot be empty.", $field, $operator));
+    }
+    if (is_array($value) && in_array($operator, ['=', '<', '>', '<=', '>=', 'IS NULL', 'IS NOT NULL'], TRUE)) {
+      if (count($value) > 1) {
+        $value = implode(', ', $value);
+        throw new InvalidQueryException(sprintf("Query condition '%s %s %s' must have an array compatible operator.", $field, $operator, $value));
+      }
+      else {
+        $value = $value[0];
+        @trigger_error('Calling ' . __METHOD__ . '() without an array compatible operator is deprecated in drupal:10.1.0 and will be required in drupal:11.0.0. See https://www.drupal.org/node/3350985', E_USER_DEPRECATED);
+      }
     }
 
     $this->conditions[] = [
@@ -385,7 +398,7 @@ class Condition implements ConditionInterface, \Countable {
       // do not need the more expensive mb_strtoupper() because SQL statements
       // are ASCII.
       $operator = strtoupper($operator);
-      $return = isset(static::$conditionOperatorMap[$operator]) ? static::$conditionOperatorMap[$operator] : [];
+      $return = static::$conditionOperatorMap[$operator] ?? [];
     }
 
     $return += ['operator' => $operator];
@@ -397,7 +410,7 @@ class Condition implements ConditionInterface, \Countable {
    * {@inheritdoc}
    */
   public function conditionGroupFactory($conjunction = 'AND') {
-    return new Condition($conjunction);
+    return new static($conjunction);
   }
 
   /**

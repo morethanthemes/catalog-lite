@@ -3,8 +3,8 @@
 namespace Drupal\editor\Plugin\Filter;
 
 use Drupal\Component\Utility\Html;
-use Drupal\Core\DependencyInjection\DeprecatedServicePropertyTrait;
 use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\Image\ImageFactory;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\file\FileInterface;
 use Drupal\filter\FilterProcessResult;
@@ -19,17 +19,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * @Filter(
  *   id = "editor_file_reference",
  *   title = @Translation("Track images uploaded via a Text Editor"),
- *   description = @Translation("Ensures that the latest versions of images uploaded via a Text Editor are displayed."),
+ *   description = @Translation("Ensures that the latest versions of images uploaded via a Text Editor are displayed, along with their dimensions."),
  *   type = Drupal\filter\Plugin\FilterInterface::TYPE_TRANSFORM_REVERSIBLE
  * )
  */
 class EditorFileReference extends FilterBase implements ContainerFactoryPluginInterface {
-  use DeprecatedServicePropertyTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $deprecatedProperties = ['entityManager' => 'entity.manager'];
 
   /**
    * The entity repository.
@@ -37,6 +31,13 @@ class EditorFileReference extends FilterBase implements ContainerFactoryPluginIn
    * @var \Drupal\Core\Entity\EntityRepositoryInterface
    */
   protected $entityRepository;
+
+  /**
+   * The image factory.
+   *
+   * @var \Drupal\Core\Image\ImageFactory
+   */
+  protected $imageFactory;
 
   /**
    * Constructs a \Drupal\editor\Plugin\Filter\EditorFileReference object.
@@ -49,9 +50,12 @@ class EditorFileReference extends FilterBase implements ContainerFactoryPluginIn
    *   The plugin implementation definition.
    * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
    *   The entity repository.
+   * @param \Drupal\Core\Image\ImageFactory $image_factory
+   *   The image factory.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityRepositoryInterface $entity_repository) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityRepositoryInterface $entity_repository, ImageFactory $image_factory) {
     $this->entityRepository = $entity_repository;
+    $this->imageFactory = $image_factory;
     parent::__construct($configuration, $plugin_id, $plugin_definition);
   }
 
@@ -63,7 +67,8 @@ class EditorFileReference extends FilterBase implements ContainerFactoryPluginIn
       $configuration,
       $plugin_id,
       $plugin_definition,
-      $container->get('entity.repository')
+      $container->get('entity.repository'),
+      $container->get('image.factory')
     );
   }
 
@@ -86,6 +91,19 @@ class EditorFileReference extends FilterBase implements ContainerFactoryPluginIn
           $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
           if ($file instanceof FileInterface) {
             $node->setAttribute('src', $file->createFileUrl());
+            if ($node->nodeName == 'img') {
+              $image = $this->imageFactory->get($file->getFileUri());
+              $width = $image->getWidth();
+              $height = $image->getHeight();
+              // Set dimensions to avoid content layout shift (CLS).
+              // @see https://web.dev/cls/
+              if ($width !== NULL && !$node->hasAttribute('width')) {
+                $node->setAttribute('width', (string) $width);
+              }
+              if ($height !== NULL && !$node->hasAttribute('height')) {
+                $node->setAttribute('height', (string) $height);
+              }
+            }
           }
         }
 

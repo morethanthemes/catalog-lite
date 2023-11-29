@@ -64,6 +64,13 @@ class ViewsQueryAlter implements ContainerInjectionInterface {
   protected $languageManager;
 
   /**
+   * An array of tables adjusted for workspace_association join.
+   *
+   * @var \WeakMap
+   */
+  protected \WeakMap $adjustedTables;
+
+  /**
    * Constructs a new ViewsQueryAlter instance.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
@@ -86,6 +93,7 @@ class ViewsQueryAlter implements ContainerInjectionInterface {
     $this->viewsData = $views_data;
     $this->viewsJoinPluginManager = $views_join_plugin_manager;
     $this->languageManager = $language_manager;
+    $this->adjustedTables = new \WeakMap();
   }
 
   /**
@@ -108,8 +116,8 @@ class ViewsQueryAlter implements ContainerInjectionInterface {
    * @see hook_views_query_alter()
    */
   public function alterQuery(ViewExecutable $view, QueryPluginBase $query) {
-    // Don't alter any views queries if we're in the default workspace.
-    if ($this->workspaceManager->getActiveWorkspace()->isDefaultWorkspace()) {
+    // Don't alter any views queries if we're not in a workspace context.
+    if (!$this->workspaceManager->hasActiveWorkspace()) {
       return;
     }
 
@@ -187,8 +195,7 @@ class ViewsQueryAlter implements ContainerInjectionInterface {
 
         // Update the join to use our COALESCE.
         $revision_field = $entity_type->getKey('revision');
-        $table_info['join']->leftTable = NULL;
-        $table_info['join']->leftField = "COALESCE($workspace_association_table.target_entity_revision_id, $relationship.$revision_field)";
+        $table_info['join']->leftFormula = "COALESCE($workspace_association_table.target_entity_revision_id, $relationship.$revision_field)";
 
         // Update the join and the table info to our new table name, and to join
         // on the revision key.
@@ -346,7 +353,7 @@ class ViewsQueryAlter implements ContainerInjectionInterface {
         // If this table previously existed, but was not added by us, we need
         // to modify the join and make sure that 'workspace_association' comes
         // first.
-        if (empty($table_queue[$alias]['join']->workspace_adjusted)) {
+        if (!$this->adjustedTables->offsetExists($table_queue[$alias]['join'])) {
           $table_queue[$alias]['join'] = $this->getRevisionTableJoin($relationship, $base_revision_table, $revision_field, $workspace_association_table, $entity_type);
           // We also have to ensure that our 'workspace_association' comes before
           // this.
@@ -379,6 +386,7 @@ class ViewsQueryAlter implements ContainerInjectionInterface {
    *
    * @return \Drupal\views\Plugin\views\join\JoinPluginInterface
    *   An adjusted views join object to add to the query.
+   *
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    */
   protected function getRevisionTableJoin($relationship, $table, $field, $workspace_association_table, EntityTypeInterface $entity_type) {
@@ -398,7 +406,7 @@ class ViewsQueryAlter implements ContainerInjectionInterface {
     /** @var \Drupal\views\Plugin\views\join\JoinPluginInterface $join */
     $join = $this->viewsJoinPluginManager->createInstance('standard', $definition);
     $join->adjusted = TRUE;
-    $join->workspace_adjusted = TRUE;
+    $this->adjustedTables[$join] = TRUE;
 
     return $join;
   }

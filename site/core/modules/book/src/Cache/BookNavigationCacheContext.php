@@ -4,9 +4,10 @@ namespace Drupal\book\Cache;
 
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\Context\CacheContextInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\node\NodeInterface;
 use Symfony\Component\DependencyInjection\ContainerAwareInterface;
 use Symfony\Component\DependencyInjection\ContainerAwareTrait;
-use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Defines the book navigation cache context service.
@@ -25,20 +26,20 @@ class BookNavigationCacheContext implements CacheContextInterface, ContainerAwar
   use ContainerAwareTrait;
 
   /**
-   * The request stack.
+   * The current route match.
    *
-   * @var \Symfony\Component\HttpFoundation\RequestStack
+   * @var \Drupal\Core\Routing\RouteMatchInterface
    */
-  protected $requestStack;
+  protected $routeMatch;
 
   /**
    * Constructs a new BookNavigationCacheContext service.
    *
-   * @param \Symfony\Component\HttpFoundation\RequestStack $request_stack
-   *   The request stack.
+   * @param \Drupal\Core\Routing\RouteMatchInterface $route_match
+   *   The current route match.
    */
-  public function __construct(RequestStack $request_stack) {
-    $this->requestStack = $request_stack;
+  public function __construct(RouteMatchInterface $route_match) {
+    $this->routeMatch = $route_match;
   }
 
   /**
@@ -54,8 +55,9 @@ class BookNavigationCacheContext implements CacheContextInterface, ContainerAwar
   public function getContext() {
     // Find the current book's ID.
     $current_bid = 0;
-    if ($node = $this->requestStack->getCurrentRequest()->get('node')) {
-      $current_bid = empty($node->book['bid']) ? 0 : $node->book['bid'];
+    $node = $this->routeMatch->getParameter('node');
+    if ($node instanceof NodeInterface && !empty($node->book['bid'])) {
+      $current_bid = $node->book['bid'];
     }
 
     // If we're not looking at a book node, then we're not navigating a book.
@@ -76,7 +78,8 @@ class BookNavigationCacheContext implements CacheContextInterface, ContainerAwar
     // The book active trail depends on the node and data attached to it.
     // That information is however not stored as part of the node.
     $cacheable_metadata = new CacheableMetadata();
-    if ($node = $this->requestStack->getCurrentRequest()->get('node')) {
+    $node = $this->routeMatch->getParameter('node');
+    if ($node instanceof NodeInterface) {
       // If the node is part of a book then we can use the cache tag for that
       // book. If not, then it can't be optimized away.
       if (!empty($node->book['bid'])) {

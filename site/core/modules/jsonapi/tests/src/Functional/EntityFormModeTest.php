@@ -10,14 +10,14 @@ use Drupal\Core\Url;
  *
  * @group jsonapi
  */
-class EntityFormModeTest extends ResourceTestBase {
+class EntityFormModeTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    *
    * @todo: Remove 'field_ui' when https://www.drupal.org/node/2867266.
    */
-  public static $modules = ['user', 'field_ui'];
+  protected static $modules = ['user', 'field_ui'];
 
   /**
    * {@inheritdoc}
@@ -35,6 +35,11 @@ class EntityFormModeTest extends ResourceTestBase {
    * @var \Drupal\Core\Entity\EntityFormModeInterface
    */
   protected $entity;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -101,6 +106,7 @@ class EntityFormModeTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
 }

@@ -41,6 +41,10 @@ class FieldStorageConfigEditForm extends EntityForm {
   /**
    * {@inheritdoc}
    *
+   * @param array $form
+   *   A nested array form elements comprising the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    * @param string $field_config
    *   The ID of the field config whose field storage config is being edited.
    */
@@ -64,13 +68,7 @@ class FieldStorageConfigEditForm extends EntityForm {
 
     $field_label = $form_state->get('field_config')->label();
     $form['#title'] = $field_label;
-    $form['#prefix'] = '<p>' . $this->t('These settings apply to the %field field everywhere it is used. These settings impact the way that data is stored in the database and cannot be changed once data has been created.', ['%field' => $field_label]) . '</p>';
-
-    // See if data already exists for this field.
-    // If so, prevent changes to the field settings.
-    if ($this->entity->hasData()) {
-      $form['#prefix'] = '<div class="messages messages--error">' . $this->t('There is data for this field in the database. The field settings can no longer be changed.') . '</div>' . $form['#prefix'];
-    }
+    $form['#prefix'] = '<p>' . $this->t('These settings apply to the %field field everywhere it is used. Some also impact the way that data is stored and cannot be changed once data has been created.', ['%field' => $field_label]) . '</p>';
 
     // Add settings provided by the field module. The field module is
     // responsible for not returning settings that cannot be changed if
@@ -194,11 +192,12 @@ class FieldStorageConfigEditForm extends EntityForm {
       // one selected. Deltas start with 0, so the selected value does not
       // need to be incremented.
       $entities_with_higher_delta = \Drupal::entityQuery($this->entity->getTargetEntityTypeId())
+        ->accessCheck(FALSE)
         ->condition($this->entity->getName() . '.%delta', $form_state->getValue('cardinality'))
         ->count()
         ->execute();
       if ($entities_with_higher_delta) {
-        $form_state->setError($element['cardinality_number'], $this->formatPlural($entities_with_higher_delta, 'There is @count entity with @delta or more values in this field.', 'There are @count entities with @delta or more values in this field.', ['@delta' => $form_state->getValue('cardinality') + 1]));
+        $form_state->setError($element['cardinality_number'], $this->formatPlural($entities_with_higher_delta, 'There is @count entity with @delta or more values in this field, so the allowed number of values cannot be set to @allowed.', 'There are @count entities with @delta or more values in this field, so the allowed number of values cannot be set to @allowed.', ['@delta' => $form_state->getValue('cardinality') + 1, '@allowed' => $form_state->getValue('cardinality')]));
       }
     }
   }
@@ -224,7 +223,7 @@ class FieldStorageConfigEditForm extends EntityForm {
       $this->entity->save();
       $this->messenger()->addStatus($this->t('Updated field %label field settings.', ['%label' => $field_label]));
       $request = $this->getRequest();
-      if (($destinations = $request->query->get('destinations')) && $next_destination = FieldUI::getNextDestination($destinations)) {
+      if (($destinations = $request->query->all('destinations')) && $next_destination = FieldUI::getNextDestination($destinations)) {
         $request->query->remove('destinations');
         $form_state->setRedirectUrl($next_destination);
       }
@@ -249,7 +248,7 @@ class FieldStorageConfigEditForm extends EntityForm {
     /** @var \Drupal\Core\Field\FieldTypePluginManager $field_type_manager */
     $field_type_manager = \Drupal::service('plugin.manager.field.field_type');
     $definition = $field_type_manager->getDefinition($this->entity->getType());
-    return isset($definition['cardinality']) ? $definition['cardinality'] : NULL;
+    return $definition['cardinality'] ?? NULL;
   }
 
 }

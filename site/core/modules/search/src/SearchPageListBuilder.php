@@ -44,6 +44,13 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
   protected $searchManager;
 
   /**
+   * The search index.
+   *
+   * @var \Drupal\search\SearchIndexInterface
+   */
+  protected $searchIndex;
+
+  /**
    * The messenger.
    *
    * @var \Drupal\Core\Messenger\MessengerInterface
@@ -63,12 +70,15 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
    *   The factory for configuration objects.
    * @param \Drupal\Core\Messenger\MessengerInterface $messenger
    *   The messenger.
+   * @param \Drupal\search\SearchIndexInterface $search_index
+   *   The search index.
    */
-  public function __construct(EntityTypeInterface $entity_type, EntityStorageInterface $storage, SearchPluginManager $search_manager, ConfigFactoryInterface $config_factory, MessengerInterface $messenger) {
+  public function __construct(EntityTypeInterface $entity_type, EntityStorageInterface $storage, SearchPluginManager $search_manager, ConfigFactoryInterface $config_factory, MessengerInterface $messenger, SearchIndexInterface $search_index) {
     parent::__construct($entity_type, $storage);
     $this->configFactory = $config_factory;
     $this->searchManager = $search_manager;
     $this->messenger = $messenger;
+    $this->searchIndex = $search_index;
   }
 
   /**
@@ -80,7 +90,8 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
       $container->get('entity_type.manager')->getStorage($entity_type->id()),
       $container->get('plugin.manager.search'),
       $container->get('config.factory'),
-      $container->get('messenger')
+      $container->get('messenger'),
+      $container->get('search.index')
     );
   }
 
@@ -127,7 +138,7 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
    * {@inheritdoc}
    */
   public function buildRow(EntityInterface $entity) {
-    /** @var $entity \Drupal\search\SearchPageInterface */
+    /** @var \Drupal\search\SearchPageInterface $entity */
     $row['label'] = $entity->label();
     $row['url']['#markup'] = 'search/' . $entity->getPath();
     // If the search page is active, link to it.
@@ -306,7 +317,7 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
    * {@inheritdoc}
    */
   public function getDefaultOperations(EntityInterface $entity) {
-    /** @var $entity \Drupal\search\SearchPageInterface */
+    /** @var \Drupal\search\SearchPageInterface $entity */
     $operations = parent::getDefaultOperations($entity);
 
     // Prevent the default search from being disabled or deleted.
@@ -344,9 +355,9 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
       $search_settings->set('index.minimum_word_size', $form_state->getValue('minimum_word_size'));
       $search_settings->set('index.overlap_cjk', $form_state->getValue('overlap_cjk'));
       // Specifically mark items in the default index for reindexing, since
-      // these settings are used in the search_index() function.
+      // these settings are used in the SearchIndex::index() function.
       $this->messenger->addStatus($this->t('The default search index will be rebuilt.'));
-      search_mark_for_reindex();
+      $this->searchIndex->markForReindex();
     }
 
     $search_settings
@@ -358,8 +369,7 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
   }
 
   /**
-   * Form submission handler for the reindex button on the search admin settings
-   * form.
+   * Form submission handler for reindex button on search admin settings form.
    */
   public function searchAdminReindexSubmit(array &$form, FormStateInterface $form_state) {
     // Send the user to the confirmation page.

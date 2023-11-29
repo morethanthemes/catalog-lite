@@ -22,10 +22,10 @@ class TaxonomyDefaultArgumentTest extends TaxonomyTestBase {
   public static $testViews = ['taxonomy_default_argument_test'];
 
   /**
-   * Init view with a request by provided url.
+   * Init view with a request by provided URL.
    *
    * @param string $request_url
-   *   The requested url.
+   *   The requested URL.
    * @param string $view_name
    *   The name of the view.
    *
@@ -58,7 +58,7 @@ class TaxonomyDefaultArgumentTest extends TaxonomyTestBase {
     $view = $this->initViewWithRequest($this->nodes[0]->toUrl()->toString());
 
     $expected = implode(',', [$this->term1->id(), $this->term2->id()]);
-    $this->assertEqual($expected, $view->argument['tid']->getDefaultArgument());
+    $this->assertEquals($expected, $view->argument['tid']->getDefaultArgument());
     $view->destroy();
   }
 
@@ -80,14 +80,14 @@ class TaxonomyDefaultArgumentTest extends TaxonomyTestBase {
     $view = $this->initViewWithRequest($this->nodes[0]->toUrl()->toString());
 
     $expected = implode(',', [$this->term1->id(), $this->term2->id()]);
-    $this->assertEqual($expected, $view->argument['tid']->getDefaultArgument());
+    $this->assertEquals($expected, $view->argument['tid']->getDefaultArgument());
   }
 
   public function testTermPath() {
     $view = $this->initViewWithRequest($this->term1->toUrl()->toString());
 
     $expected = $this->term1->id();
-    $this->assertEqual($expected, $view->argument['tid']->getDefaultArgument());
+    $this->assertEquals($expected, $view->argument['tid']->getDefaultArgument());
   }
 
 }

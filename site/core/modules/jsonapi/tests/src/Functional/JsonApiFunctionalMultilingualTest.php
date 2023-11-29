@@ -15,7 +15,6 @@ use GuzzleHttp\RequestOptions;
  * Tests JSON:API multilingual support.
  *
  * @group jsonapi
- * @group legacy
  *
  * @internal
  */
@@ -24,7 +23,7 @@ class JsonApiFunctionalMultilingualTest extends JsonApiFunctionalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = [
+  protected static $modules = [
     'language',
     'content_translation',
   ];
@@ -32,7 +31,12 @@ class JsonApiFunctionalMultilingualTest extends JsonApiFunctionalTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected $defaultTheme = 'stark';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
     parent::setUp();
     $language = ConfigurableLanguage::createFromLangcode('ca');
     $language->save();
@@ -157,7 +161,7 @@ class JsonApiFunctionalMultilingualTest extends JsonApiFunctionalTestBase {
 
     // Changing the langcode of the default ('en') translation is possible:
     // first verify that it currently is 'en', then change it to 'ca-fr', and
-    // verify that the the title is unchanged, but the langcode is updated.
+    // verify that the title is unchanged, but the langcode is updated.
     $response = $this->request('GET', Url::fromUri('base:/jsonapi/node/article/' . $this->nodes[0]->uuid()), $request_options);
     $this->assertSame(200, $response->getStatusCode());
     $document = Json::decode((string) $response->getBody());
@@ -315,7 +319,7 @@ class JsonApiFunctionalMultilingualTest extends JsonApiFunctionalTestBase {
 
     $response = $this->request('DELETE', Url::fromUri('base:/jsonapi/node/article/' . $this->nodes[0]->uuid()), []);
     $this->assertSame(204, $response->getStatusCode());
-    $this->assertFalse(Node::load($this->nodes[0]->id()));
+    $this->assertNull(Node::load($this->nodes[0]->id()));
   }
 
 }

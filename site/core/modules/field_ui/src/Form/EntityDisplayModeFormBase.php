@@ -67,8 +67,9 @@ abstract class EntityDisplayModeFormBase extends EntityForm {
     if ($entity_id == 'default') {
       return TRUE;
     }
-    return (bool) $this->entityTypeManager
-      ->getStorage($this->entity->getEntityTypeId())
+    /** @var \Drupal\Core\Config\Entity\ConfigEntityStorageInterface $storage */
+    $storage = $this->entityTypeManager->getStorage($this->entity->getEntityTypeId());
+    return (bool) $storage
       ->getQuery()
       ->condition('id', $element['#field_prefix'] . $entity_id)
       ->execute();
@@ -78,9 +79,9 @@ abstract class EntityDisplayModeFormBase extends EntityForm {
    * {@inheritdoc}
    */
   public function save(array $form, FormStateInterface $form_state) {
-    $this->messenger()->addStatus($this->t('Saved the %label @entity-type.', ['%label' => $this->entity->label(), '@entity-type' => $this->entityType->getLowercaseLabel()]));
+    $this->messenger()->addStatus($this->t('Saved the %label @entity-type.', ['%label' => $this->entity->label(), '@entity-type' => $this->entityType->getSingularLabel()]));
     $this->entity->save();
-    \Drupal::entityManager()->clearCachedFieldDefinitions();
+    \Drupal::service('entity_field.manager')->clearCachedFieldDefinitions();
     $form_state->setRedirectUrl($this->entity->toUrl('collection'));
   }
 

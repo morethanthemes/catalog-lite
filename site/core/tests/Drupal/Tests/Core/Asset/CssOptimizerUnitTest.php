@@ -3,6 +3,7 @@
 namespace Drupal\Tests\Core\Asset;
 
 use Drupal\Core\Asset\CssOptimizer;
+use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Tests\UnitTestCase;
 
 /**
@@ -24,10 +25,26 @@ class CssOptimizerUnitTest extends UnitTestCase {
    */
   protected $optimizer;
 
-  protected function setUp() {
-    parent::setUp();
+  /**
+   * The file URL generator mock.
+   *
+   * @var \Drupal\Core\File\FileUrlGeneratorInterface|\PHPUnit\Framework\MockObject\MockObject
+   */
+  protected $fileUrlGenerator;
 
-    $this->optimizer = new CssOptimizer();
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
+    parent::setUp();
+    $this->fileUrlGenerator = $this->createMock(FileUrlGeneratorInterface::class);
+    $this->fileUrlGenerator->expects($this->any())
+      ->method('generateString')
+      ->with($this->isType('string'))
+      ->willReturnCallback(function ($uri) {
+        return 'generated-relative-url:' . $uri;
+      });
+    $this->optimizer = new CssOptimizer($this->fileUrlGenerator);
   }
 
   /**
@@ -49,18 +66,33 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'css_input_without_import.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'css_input_without_import.css',
         ],
         file_get_contents($absolute_path . 'css_input_without_import.css.optimized.css'),
+      ],
+      [
+        [
+          'group' => -100,
+          'type' => 'file',
+          'weight' => 0.012,
+          'media' => 'screen',
+          'preprocess' => TRUE,
+          'data' => $path . 'css_input_simple.css',
+          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
+          'basename' => 'css_input_simple.css',
+        ],
+        file_get_contents($absolute_path . 'css_input_simple_with_media.css.optimized.css'),
       ],
       // File. Tests:
       // - Proper URLs in imported files. (https://www.drupal.org/node/265719)
       // - A background image with relative paths, which must be rewritten.
       // - The rewritten background image path must also be passed through
-      //   file_create_url(). (https://www.drupal.org/node/1961340)
+      //   FileUrlGeneratorInterface::generate().
+      //   (https://www.drupal.org/node/1961340)
       // - Imported files that are external (protocol-relative URL or not)
       //   should not be expanded. (https://www.drupal.org/node/2014851)
+      //   Potential forms of @import might also include media queries.
+      //   (https://developer.mozilla.org/en-US/docs/Web/CSS/@import)
       [
         [
           'group' => -100,
@@ -69,10 +101,9 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'css_input_with_import.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'css_input_with_import.css',
         ],
-        str_replace('url(images/icon.png)', 'url(' . file_url_transform_relative(file_create_url($path . 'images/icon.png')) . ')', file_get_contents($absolute_path . 'css_input_with_import.css.optimized.css')),
+        str_replace("url('import1.css')", 'url(generated-relative-url:' . $path . 'import1.css)', str_replace('url(images/icon.png)', 'url(generated-relative-url:' . $path . 'images/icon.png)', file_get_contents($absolute_path . 'css_input_with_import.css.optimized.css'))),
       ],
       // File. Tests:
       // - Retain comment hacks.
@@ -84,7 +115,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'comment_hacks.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'comment_hacks.css',
         ],
         file_get_contents($absolute_path . 'comment_hacks.css.optimized.css'),
@@ -101,10 +131,9 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'css_subfolder/css_input_with_import.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'css_input_with_import.css',
         ],
-        str_replace('url(../images/icon.png)', 'url(' . file_url_transform_relative(file_create_url($path . 'images/icon.png')) . ')', file_get_contents($absolute_path . 'css_subfolder/css_input_with_import.css.optimized.css')),
+        str_replace('url(../images/icon.png)', 'url(generated-relative-url:' . $path . 'images/icon.png)', file_get_contents($absolute_path . 'css_subfolder/css_input_with_import.css.optimized.css')),
       ],
       // File. Tests:
       // - Any @charset declaration at the beginning of a file should be
@@ -117,7 +146,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'charset_sameline.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'charset_sameline.css',
         ],
         file_get_contents($absolute_path . 'charset.css.optimized.css'),
@@ -130,7 +158,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'charset_newline.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'charset_newline.css',
         ],
         file_get_contents($absolute_path . 'charset.css.optimized.css'),
@@ -143,7 +170,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'css_input_with_bom.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'css_input_with_bom.css',
         ],
         '.byte-order-mark-test{content:"☃";}' . "\n",
@@ -156,7 +182,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'css_input_with_charset.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'css_input_with_charset.css',
         ],
         '.charset-test{content:"€";}' . "\n",
@@ -169,7 +194,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'css_input_with_bom_and_charset.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'css_input_with_bom_and_charset.css',
         ],
         '.byte-order-mark-charset-test{content:"☃";}' . "\n",
@@ -182,7 +206,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'css_input_with_utf16_bom.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'css_input_with_utf16_bom.css',
         ],
         '.utf16-byte-order-mark-test{content:"☃";}' . "\n",
@@ -195,10 +218,21 @@ class CssOptimizerUnitTest extends UnitTestCase {
           'media' => 'all',
           'preprocess' => TRUE,
           'data' => $path . 'quotes.css',
-          'browsers' => ['IE' => TRUE, '!IE' => TRUE],
           'basename' => 'quotes.css',
         ],
         file_get_contents($absolute_path . 'quotes.css.optimized.css'),
+      ],
+      [
+        [
+          'group' => -100,
+          'type' => 'file',
+          'weight' => 0.013,
+          'media' => 'all',
+          'preprocess' => TRUE,
+          'data' => $path . 'import3.css',
+          'basename' => 'import3.css',
+        ],
+        file_get_contents($absolute_path . 'import3.css.optimized.css'),
       ],
     ];
   }
@@ -227,7 +261,8 @@ class CssOptimizerUnitTest extends UnitTestCase {
    * Tests a file CSS asset with preprocessing disabled.
    */
   public function testTypeFilePreprocessingDisabled() {
-    $this->setExpectedException('Exception', 'Only file CSS assets with preprocessing enabled can be optimized.');
+    $this->expectException('Exception');
+    $this->expectExceptionMessage('Only file CSS assets with preprocessing enabled can be optimized.');
 
     $css_asset = [
       'group' => -100,
@@ -237,7 +272,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
       // Preprocessing disabled.
       'preprocess' => FALSE,
       'data' => 'tests/Drupal/Tests/Core/Asset/foo.css',
-      'browsers' => ['IE' => TRUE, '!IE' => TRUE],
       'basename' => 'foo.css',
     ];
     $this->optimizer->optimize($css_asset);
@@ -247,7 +281,8 @@ class CssOptimizerUnitTest extends UnitTestCase {
    * Tests a CSS asset with 'type' => 'external'.
    */
   public function testTypeExternal() {
-    $this->setExpectedException('Exception', 'Only file CSS assets can be optimized.');
+    $this->expectException('Exception');
+    $this->expectExceptionMessage('Only file CSS assets can be optimized.');
 
     $css_asset = [
       'group' => -100,
@@ -257,7 +292,6 @@ class CssOptimizerUnitTest extends UnitTestCase {
       'media' => 'all',
       'preprocess' => TRUE,
       'data' => 'http://example.com/foo.js',
-      'browsers' => ['IE' => TRUE, '!IE' => TRUE],
     ];
     $this->optimizer->optimize($css_asset);
   }
@@ -265,58 +299,10 @@ class CssOptimizerUnitTest extends UnitTestCase {
 }
 
 /**
- * Temporary mock for file_create_url(), until that is moved into
- * Component/Utility.
- */
-if (!function_exists('Drupal\Tests\Core\Asset\file_create_url')) {
-
-  function file_create_url($uri) {
-    return 'file_create_url:' . $uri;
-  }
-
-}
-
-/**
- * Temporary mock of file_url_transform_relative, until that is moved into
- * Component/Utility.
- */
-if (!function_exists('Drupal\Tests\Core\Asset\file_url_transform_relative')) {
-
-  function file_url_transform_relative($uri) {
-    return 'file_url_transform_relative:' . $uri;
-  }
-
-}
-
-/**
- * CssCollectionRenderer uses file_create_url() & file_url_transform_relative(),
- * which *are* available when using the Simpletest test runner, but not when
- * using the PHPUnit test runner; hence this hack.
+ * CssCollectionRenderer uses file_uri_scheme() which need to be mocked.
  */
 namespace Drupal\Core\Asset;
 
-if (!function_exists('Drupal\Core\Asset\file_create_url')) {
-
-  /**
-   * Temporary mock for file_create_url(), until that is moved into
-   * Component/Utility.
-   */
-  function file_create_url($uri) {
-    return \Drupal\Tests\Core\Asset\file_create_url($uri);
-  }
-
-}
-if (!function_exists('Drupal\Core\Asset\file_url_transform_relative')) {
-
-  /**
-   * Temporary mock of file_url_transform_relative, until that is moved into
-   * Component/Utility.
-   */
-  function file_url_transform_relative($uri) {
-    return \Drupal\Tests\Core\Asset\file_url_transform_relative($uri);
-  }
-
-}
 if (!function_exists('Drupal\Core\Asset\file_uri_scheme')) {
 
   function file_uri_scheme($uri) {

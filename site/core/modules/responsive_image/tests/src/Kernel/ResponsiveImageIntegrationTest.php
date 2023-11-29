@@ -18,12 +18,21 @@ class ResponsiveImageIntegrationTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['responsive_image', 'field', 'image', 'file', 'entity_test', 'breakpoint', 'responsive_image_test_module', 'user'];
+  protected static $modules = [
+    'responsive_image',
+    'field',
+    'image',
+    'file',
+    'entity_test',
+    'breakpoint',
+    'responsive_image_test_module',
+    'user',
+  ];
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('entity_test');
   }
@@ -64,7 +73,7 @@ class ResponsiveImageIntegrationTest extends KernelTestBase {
 
     // Check that the 'foo' field is on the display.
     $this->assertNotNull($display = EntityViewDisplay::load('entity_test.entity_test.default'));
-    $this->assertTrue($display->getComponent('bar'));
+    $this->assertNotEmpty($display->getComponent('bar'));
     $this->assertArrayNotHasKey('bar', $display->get('hidden'));
 
     // Delete the responsive image style.

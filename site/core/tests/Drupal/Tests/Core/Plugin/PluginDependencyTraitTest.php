@@ -11,6 +11,7 @@ use Drupal\Core\Plugin\Definition\DependentPluginDefinitionInterface;
 use Drupal\Core\Plugin\PluginDependencyTrait;
 use Drupal\Tests\UnitTestCase;
 use Prophecy\Prophecy\ProphecyInterface;
+use Prophecy\Prophet;
 
 /**
  * @coversDefaultClass \Drupal\Core\Plugin\PluginDependencyTrait
@@ -77,12 +78,13 @@ class PluginDependencyTraitTest extends UnitTestCase {
   /**
    * Provides test data for plugin dependencies.
    */
-  public function providerTestPluginDependencies() {
+  public static function providerTestPluginDependencies() {
+    $prophet = new Prophet();
     $data = [];
 
-    $plugin = $this->prophesize(PluginInspectionInterface::class);
+    $plugin = $prophet->prophesize(PluginInspectionInterface::class);
 
-    $dependent_plugin = $this->prophesize(PluginInspectionInterface::class)->willImplement(DependentPluginInterface::class);
+    $dependent_plugin = $prophet->prophesize(PluginInspectionInterface::class)->willImplement(DependentPluginInterface::class);
     $dependent_plugin->calculateDependencies()->willReturn([
       'module' => ['test_module2'],
     ]);
@@ -136,7 +138,7 @@ class PluginDependencyTraitTest extends UnitTestCase {
       ],
     ];
 
-    $definition = $this->prophesize(PluginDefinitionInterface::class);
+    $definition = $prophet->prophesize(PluginDefinitionInterface::class);
     $definition->getProvider()->willReturn('test_module1');
     $data['object_definition'] = [
       $plugin,
@@ -148,7 +150,7 @@ class PluginDependencyTraitTest extends UnitTestCase {
       ],
     ];
 
-    $dependent_definition = $this->prophesize(PluginDefinitionInterface::class)->willImplement(DependentPluginDefinitionInterface::class);
+    $dependent_definition = $prophet->prophesize(PluginDefinitionInterface::class)->willImplement(DependentPluginDefinitionInterface::class);
     $dependent_definition->getProvider()->willReturn('test_module1');
     $dependent_definition->getConfigDependencies()->willReturn(['module' => ['test_module2']]);
     $data['dependent_object_definition'] = [
@@ -162,38 +164,6 @@ class PluginDependencyTraitTest extends UnitTestCase {
       ],
     ];
     return $data;
-  }
-
-  /**
-   * @covers ::getPluginDependencies
-   *
-   * @group legacy
-   * @expectedDeprecated Declaring a dependency on an uninstalled module is deprecated in Drupal 8.7.0 and will not be supported in Drupal 9.0.0.
-   */
-  public function testNeitherThemeNorModule() {
-    $test_class = new TestPluginDependency();
-
-    $plugin = $this->prophesize(PluginInspectionInterface::class);
-    $definition = $this->prophesize(PluginDefinitionInterface::class);
-    $definition->getProvider()->willReturn('neither_theme_nor_module');
-
-    $module_handler = $this->prophesize(ModuleHandlerInterface::class);
-    $module_handler->moduleExists('neither_theme_nor_module')->willReturn(FALSE);
-    $test_class->setModuleHandler($module_handler->reveal());
-
-    $theme_handler = $this->prophesize(ThemeHandlerInterface::class);
-    $theme_handler->themeExists('neither_theme_nor_module')->willReturn(FALSE);
-    $test_class->setThemeHandler($theme_handler->reveal());
-
-    $plugin->getPluginDefinition()->willReturn($definition);
-
-    $actual = $test_class->getPluginDependencies($plugin->reveal());
-    $expected = [
-      'module' => [
-        'neither_theme_nor_module',
-      ],
-    ];
-    $this->assertEquals($expected, $actual);
   }
 
 }

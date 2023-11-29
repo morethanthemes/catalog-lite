@@ -20,7 +20,7 @@ class DatabaseBackendTagTest extends KernelTestBase {
    *
    * @var array
    */
-  public static $modules = ['system'];
+  protected static $modules = ['system'];
 
   /**
    * {@inheritdoc}
@@ -41,7 +41,7 @@ class DatabaseBackendTagTest extends KernelTestBase {
     foreach ($bins as $bin) {
       $bin = \Drupal::cache($bin);
       $bin->set('test', 'value', Cache::PERMANENT, $tags);
-      $this->assertTrue($bin->get('test'), 'Cache item was set in bin.');
+      $this->assertNotEmpty($bin->get('test'), 'Cache item was set in bin.');
     }
 
     $connection = Database::getConnection();
@@ -56,7 +56,7 @@ class DatabaseBackendTagTest extends KernelTestBase {
 
     // Test that only one tag invalidation has occurred.
     $invalidations_after = intval($connection->select('cachetags')->fields('cachetags', ['invalidations'])->condition('tag', 'test_tag:2')->execute()->fetchField());
-    $this->assertEqual($invalidations_after, $invalidations_before + 1, 'Only one addition cache tag invalidation has occurred after invalidating a tag used in multiple bins.');
+    $this->assertEquals($invalidations_before + 1, $invalidations_after, 'Only one addition cache tag invalidation has occurred after invalidating a tag used in multiple bins.');
   }
 
 }

@@ -5,8 +5,8 @@ namespace Drupal\FunctionalTests;
 use Drupal\Tests\BrowserTestBase;
 
 /**
- * This test will check BrowserTestBase's treatment of hook_install during
- * setUp.
+ * Tests BrowserTestBase's treatment of hook_install() during setup.
+ *
  * Image module is used for test.
  *
  * @group browsertestbase
@@ -18,10 +18,15 @@ class FolderTest extends BrowserTestBase {
    *
    * @var array
    */
-  public static $modules = ['image'];
+  protected static $modules = ['image'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   public function testFolderSetup() {
-    $directory = file_default_scheme() . '://styles';
+    $directory = 'public://styles';
     $this->assertTrue(\Drupal::service('file_system')->prepareDirectory($directory, FALSE), 'Directory created.');
   }
 

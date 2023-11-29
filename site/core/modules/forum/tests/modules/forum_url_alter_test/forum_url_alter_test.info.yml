@@ -1,0 +1,10 @@
+name: 'forum_Url_alter tests'
+type: module
+description: 'A support module to test altering the inbound and outbound path.'
+package: Testing
+# version: VERSION
+
+# Information added by Drupal.org packaging script on 2023-11-01
+version: '10.1.6'
+project: 'drupal'
+datestamp: 1698841355

@@ -30,7 +30,7 @@ class FieldEntityLinkTest extends ViewsKernelTestBase {
    *
    * @var array
    */
-  public static $modules = ['user', 'entity_test'];
+  protected static $modules = ['user', 'entity_test'];
 
   /**
    * An admin user account.
@@ -143,11 +143,11 @@ class FieldEntityLinkTest extends ViewsKernelTestBase {
             $expected_link = '<a href="' . $path . $destination . '" hreflang="en">' . $info[$template]['label'] . '</a>';
           }
           else {
-            $expected_link = $path;
+            $expected_link = (string) $path;
           }
         }
         $link = $view->style_plugin->getField($index, $info[$template]['field_id']);
-        $this->assertEqual($link, $expected_link);
+        $this->assertSame($expected_link, (string) $link);
       }
       $index++;
     }

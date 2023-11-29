@@ -13,7 +13,9 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\ElementInfoManagerInterface;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Url;
+use Drupal\file\FileRepositoryInterface;
 use Drupal\file\FileInterface;
+use Drupal\file\FileUsage\FileUsageInterface;
 use Drupal\file\Plugin\Field\FieldType\FileFieldItemList;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
 use Drupal\media\MediaInterface;
@@ -26,9 +28,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Creates a form to create media entities from uploaded files.
  *
  * @internal
- *   Media Library is an experimental module and its internal code may be
- *   subject to change in minor releases. External code should not instantiate
- *   or extend this class.
+ *   Form classes are internal.
  */
 class FileUploadForm extends AddFormBase {
 
@@ -54,6 +54,20 @@ class FileUploadForm extends AddFormBase {
   protected $fileSystem;
 
   /**
+   * The file usage service.
+   *
+   * @var \Drupal\file\FileUsage\FileUsageInterface
+   */
+  protected $fileUsage;
+
+  /**
+   * The file repository service.
+   *
+   * @var \Drupal\file\FileRepositoryInterface
+   */
+  protected $fileRepository;
+
+  /**
    * Constructs a new FileUploadForm.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
@@ -68,12 +82,18 @@ class FileUploadForm extends AddFormBase {
    *   The file system service.
    * @param \Drupal\media_library\OpenerResolverInterface $opener_resolver
    *   The opener resolver.
+   * @param \Drupal\file\FileUsage\FileUsageInterface $file_usage
+   *   The file usage service.
+   * @param \Drupal\file\FileRepositoryInterface $file_repository
+   *   The file repository service.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, MediaLibraryUiBuilder $library_ui_builder, ElementInfoManagerInterface $element_info, RendererInterface $renderer, FileSystemInterface $file_system, OpenerResolverInterface $opener_resolver = NULL) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, MediaLibraryUiBuilder $library_ui_builder, ElementInfoManagerInterface $element_info, RendererInterface $renderer, FileSystemInterface $file_system, OpenerResolverInterface $opener_resolver, FileUsageInterface $file_usage, FileRepositoryInterface $file_repository) {
     parent::__construct($entity_type_manager, $library_ui_builder, $opener_resolver);
     $this->elementInfo = $element_info;
     $this->renderer = $renderer;
     $this->fileSystem = $file_system;
+    $this->fileUsage = $file_usage;
+    $this->fileRepository = $file_repository;
   }
 
   /**
@@ -86,8 +106,17 @@ class FileUploadForm extends AddFormBase {
       $container->get('element_info'),
       $container->get('renderer'),
       $container->get('file_system'),
-      $container->get('media_library.opener_resolver')
+      $container->get('media_library.opener_resolver'),
+      $container->get('file.usage'),
+      $container->get('file.repository')
     );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFormId() {
+    return $this->getBaseFormId() . '_upload';
   }
 
   /**
@@ -112,8 +141,6 @@ class FileUploadForm extends AddFormBase {
    * {@inheritdoc}
    */
   protected function buildInputElement(array $form, FormStateInterface $form_state) {
-    $form['#attributes']['class'][] = 'media-library-add-form--upload';
-
     // Create a file item to get the upload validators.
     $media_type = $this->getMediaType($form_state);
     $item = $this->createFileItem($media_type);
@@ -129,9 +156,6 @@ class FileUploadForm extends AddFormBase {
     // Add a container to group the input elements for styling purposes.
     $form['container'] = [
       '#type' => 'container',
-      '#attributes' => [
-        'class' => ['media-library-add-form__input-wrapper'],
-      ],
     ];
 
     $process = (array) $this->elementInfo->getInfoProperty('managed_file', '#process', []);
@@ -141,8 +165,11 @@ class FileUploadForm extends AddFormBase {
       // @todo Move validation in https://www.drupal.org/node/2988215
       '#process' => array_merge(['::validateUploadElement'], $process, ['::processUploadElement']),
       '#upload_validators' => $item->getUploadValidators(),
-      '#multiple' => $slots > 1 || $slots === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
-      '#cardinality' => $slots,
+      '#multiple' => TRUE,
+      // Do not limit the number uploaded. There is validation based on the
+      // number selected in the media library that prevents overages.
+      // @see Drupal\media_library\Form\AddFormBase::updateLibrary()
+      '#cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       '#remaining_slots' => $slots,
     ];
 
@@ -229,6 +256,52 @@ class FileUploadForm extends AddFormBase {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  protected function buildEntityFormElement(MediaInterface $media, array $form, FormStateInterface $form_state, $delta) {
+    $element = parent::buildEntityFormElement($media, $form, $form_state, $delta);
+    $source_field = $this->getSourceFieldName($media->bundle->entity);
+    if (isset($element['fields'][$source_field])) {
+      $element['fields'][$source_field]['widget'][0]['#process'][] = [static::class, 'hideExtraSourceFieldComponents'];
+    }
+    return $element;
+  }
+
+  /**
+   * Processes an image or file source field element.
+   *
+   * @param array $element
+   *   The entity form source field element.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current form state.
+   * @param $form
+   *   The complete form.
+   *
+   * @return array
+   *   The processed form element.
+   */
+  public static function hideExtraSourceFieldComponents($element, FormStateInterface $form_state, $form) {
+    // Remove original button added by ManagedFile::processManagedFile().
+    if (!empty($element['remove_button'])) {
+      $element['remove_button']['#access'] = FALSE;
+    }
+    // Remove preview added by ImageWidget::process().
+    if (!empty($element['preview'])) {
+      $element['preview']['#access'] = FALSE;
+    }
+
+    $element['#title_display'] = 'none';
+    $element['#description_display'] = 'none';
+
+    // Remove the filename display.
+    foreach ($element['#files'] as $file) {
+      $element['file_' . $file->id()]['filename']['#access'] = FALSE;
+    }
+
+    return $element;
+  }
+
+  /**
    * Submit handler for the upload button, inside the managed_file element.
    *
    * @param array $form
@@ -257,7 +330,7 @@ class FileUploadForm extends AddFormBase {
     if (!$this->fileSystem->prepareDirectory($upload_location, FileSystemInterface::CREATE_DIRECTORY)) {
       throw new FileWriteException("The destination directory '$upload_location' is not writable");
     }
-    $file = file_move($file, $upload_location);
+    $file = $this->fileRepository->move($file, $upload_location);
     if (!$file) {
       throw new \RuntimeException("Unable to move file to '$upload_location'");
     }
@@ -288,6 +361,31 @@ class FileUploadForm extends AddFormBase {
     $file = $media->get($this->getSourceFieldName($media->bundle->entity))->entity;
     $file->setPermanent();
     $file->save();
+  }
+
+  /**
+   * Submit handler for the remove button.
+   *
+   * @param array $form
+   *   The form render array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   */
+  public function removeButtonSubmit(array $form, FormStateInterface $form_state) {
+    // Retrieve the delta of the media item from the parents of the remove
+    // button.
+    $triggering_element = $form_state->getTriggeringElement();
+    $delta = array_slice($triggering_element['#array_parents'], -2, 1)[0];
+
+    /** @var \Drupal\media\MediaInterface $removed_media */
+    $removed_media = $form_state->get(['media', $delta]);
+
+    $file = $removed_media->get($this->getSourceFieldName($removed_media->bundle->entity))->entity;
+    if ($file instanceof FileInterface && empty($this->fileUsage->listUsage($file))) {
+      $file->delete();
+    }
+
+    parent::removeButtonSubmit($form, $form_state);
   }
 
 }

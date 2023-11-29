@@ -10,12 +10,12 @@ use Drupal\Core\Url;
  *
  * @group jsonapi
  */
-class DateFormatTest extends ResourceTestBase {
+class DateFormatTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = [];
+  protected static $modules = [];
 
   /**
    * {@inheritdoc}
@@ -38,6 +38,11 @@ class DateFormatTest extends ResourceTestBase {
    * @var \Drupal\Core\Datetime\DateFormatInterface
    */
   protected $entity;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -103,6 +108,7 @@ class DateFormatTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
 }

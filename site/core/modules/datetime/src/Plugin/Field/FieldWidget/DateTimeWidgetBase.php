@@ -22,7 +22,7 @@ class DateTimeWidgetBase extends WidgetBase {
       '#type' => 'datetime',
       '#default_value' => NULL,
       '#date_increment' => 1,
-      '#date_timezone' => drupal_get_user_timezone(),
+      '#date_timezone' => date_default_timezone_get(),
       '#required' => $element['#required'],
     ];
 
@@ -33,11 +33,7 @@ class DateTimeWidgetBase extends WidgetBase {
     }
 
     if ($items[$delta]->date) {
-      $date = $items[$delta]->date;
-      // The date was created and verified during field_load(), so it is safe to
-      // use without further inspection.
-      $date->setTimezone(new \DateTimeZone($element['value']['#date_timezone']));
-      $element['value']['#default_value'] = $this->createDefaultValue($date, $element['value']['#date_timezone']);
+      $element['value']['#default_value'] = $this->createDefaultValue($items[$delta]->date, $element['value']['#date_timezone']);
     }
 
     return $element;
@@ -90,10 +86,16 @@ class DateTimeWidgetBase extends WidgetBase {
   protected function createDefaultValue($date, $timezone) {
     // The date was created and verified during field_load(), so it is safe to
     // use without further inspection.
+    $year = $date->format('Y');
+    $month = $date->format('m');
+    $day = $date->format('d');
+    $date->setTimezone(new \DateTimeZone($timezone));
     if ($this->getFieldSetting('datetime_type') === DateTimeItem::DATETIME_TYPE_DATE) {
       $date->setDefaultDateTime();
+      // Reset the date to handle cases where the UTC offset is greater than
+      // 12 hours.
+      $date->setDate($year, $month, $day);
     }
-    $date->setTimezone(new \DateTimeZone($timezone));
     return $date;
   }
 

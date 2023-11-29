@@ -103,7 +103,7 @@ class ConfigEntityStorageTest extends UnitTestCase {
    *
    * @covers ::__construct
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->entityTypeId = 'test_entity_type';
@@ -247,6 +247,7 @@ class ConfigEntityStorageTest extends UnitTestCase {
    * @covers ::doSave
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity to test.
    *
    * @return \Drupal\Core\Entity\EntityInterface
    *
@@ -299,6 +300,7 @@ class ConfigEntityStorageTest extends UnitTestCase {
    * @covers ::doSave
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity to test.
    *
    * @return \Drupal\Core\Entity\EntityInterface
    *
@@ -410,7 +412,8 @@ class ConfigEntityStorageTest extends UnitTestCase {
       ->shouldNotBeCalled();
 
     $entity = $this->getMockEntity();
-    $this->setExpectedException(EntityMalformedException::class, 'The entity does not have an ID.');
+    $this->expectException(EntityMalformedException::class);
+    $this->expectExceptionMessage('The entity does not have an ID.');
     $this->entityStorage->save($entity);
   }
 
@@ -431,7 +434,7 @@ class ConfigEntityStorageTest extends UnitTestCase {
     $entity = $this->getMockEntity(['id' => 'foo']);
     $entity->enforceIsNew();
 
-    $this->setExpectedException(EntityStorageException::class);
+    $this->expectException(EntityStorageException::class);
     $this->entityStorage->save($entity);
   }
 
@@ -453,7 +456,8 @@ class ConfigEntityStorageTest extends UnitTestCase {
     $this->entityQuery->execute()->willReturn(['baz']);
 
     $entity = $this->getMockEntity(['id' => 'foo']);
-    $this->setExpectedException(ConfigDuplicateUUIDException::class, 'when this UUID is already used for');
+    $this->expectException(ConfigDuplicateUUIDException::class);
+    $this->expectExceptionMessage('when this UUID is already used for');
     $this->entityStorage->save($entity);
   }
 
@@ -522,16 +526,14 @@ class ConfigEntityStorageTest extends UnitTestCase {
       ->willReturn($config_object->reveal());
     $this->configFactory->rename(Argument::cetera())->shouldNotBeCalled();
 
-    $this->moduleHandler->getImplementations('entity_load')->willReturn([]);
-    $this->moduleHandler->getImplementations('test_entity_type_load')->willReturn([]);
-
     $this->entityQuery->condition('uuid', 'baz')->willReturn($this->entityQuery);
     $this->entityQuery->execute()->willReturn(['foo']);
 
     $entity = $this->getMockEntity(['id' => 'foo']);
 
     $entity->set('uuid', 'baz');
-    $this->setExpectedException(ConfigDuplicateUUIDException::class, 'when this entity already exists with UUID');
+    $this->expectException(ConfigDuplicateUUIDException::class);
+    $this->expectExceptionMessage('when this entity already exists with UUID');
     $this->entityStorage->save($entity);
   }
 
@@ -553,14 +555,12 @@ class ConfigEntityStorageTest extends UnitTestCase {
     $this->configFactory->loadMultiple(['the_provider.the_config_prefix.foo'])
       ->willReturn([$config_object->reveal()]);
 
-    $this->moduleHandler->getImplementations('entity_load')->willReturn([]);
-    $this->moduleHandler->getImplementations('test_entity_type_load')->willReturn([]);
-
     $entity = $this->entityStorage->load('foo');
     $this->assertInstanceOf(EntityInterface::class, $entity);
     $this->assertSame('foo', $entity->id());
 
-    $this->setExpectedException(\AssertionError::class, 'Cannot load a NULL ID.');
+    $this->expectException(\AssertionError::class);
+    $this->expectExceptionMessage(sprintf('Cannot load the "%s" entity with NULL ID.', $this->entityTypeId));
     $this->entityStorage->load(NULL);
   }
 
@@ -592,9 +592,6 @@ class ConfigEntityStorageTest extends UnitTestCase {
     $this->configFactory->loadMultiple(['the_provider.the_config_prefix.foo', 'the_provider.the_config_prefix.bar'])
       ->willReturn([$foo_config_object->reveal(), $bar_config_object->reveal()]);
 
-    $this->moduleHandler->getImplementations('entity_load')->willReturn([]);
-    $this->moduleHandler->getImplementations('test_entity_type_load')->willReturn([]);
-
     $entities = $this->entityStorage->loadMultiple();
     $expected['foo'] = 'foo';
     $expected['bar'] = 'bar';
@@ -623,9 +620,6 @@ class ConfigEntityStorageTest extends UnitTestCase {
     $this->configFactory->loadMultiple(['the_provider.the_config_prefix.foo'])
       ->willReturn([$config_object->reveal()]);
 
-    $this->moduleHandler->getImplementations('entity_load')->willReturn([]);
-    $this->moduleHandler->getImplementations('test_entity_type_load')->willReturn([]);
-
     $entities = $this->entityStorage->loadMultiple(['foo']);
     $this->assertContainsOnlyInstancesOf(EntityInterface::class, $entities);
     foreach ($entities as $id => $entity) {
@@ -635,19 +629,24 @@ class ConfigEntityStorageTest extends UnitTestCase {
 
   /**
    * @covers ::loadRevision
+   * @group legacy
    */
   public function testLoadRevision() {
-    $this->assertSame(NULL, $this->entityStorage->loadRevision(1));
+    $this->expectDeprecation('Drupal\Core\Config\Entity\ConfigEntityStorage::loadRevision() is deprecated in drupal:10.1.0 and is removed from drupal:11.0.0. Use \Drupal\Core\Entity\RevisionableStorageInterface::loadRevision instead. See https://www.drupal.org/node/3294237');
+    $this->assertNull($this->entityStorage->loadRevision(1));
   }
 
   /**
    * @covers ::deleteRevision
+   * @group legacy
    */
   public function testDeleteRevision() {
+    $this->expectDeprecation('Drupal\Core\Config\Entity\ConfigEntityStorage::deleteRevision() is deprecated in drupal:10.1.0 and is removed from drupal:11.0.0. Use \Drupal\Core\Entity\RevisionableStorageInterface::deleteRevision instead. See https://www.drupal.org/node/3294237');
+
     $this->cacheTagsInvalidator->invalidateTags(Argument::cetera())
       ->shouldNotBeCalled();
 
-    $this->assertSame(NULL, $this->entityStorage->deleteRevision(1));
+    $this->assertNull($this->entityStorage->deleteRevision(1));
   }
 
   /**
@@ -697,7 +696,6 @@ class ConfigEntityStorageTest extends UnitTestCase {
    * @covers ::doDelete
    */
   public function testDeleteNothing() {
-    $this->moduleHandler->getImplementations(Argument::cetera())->shouldNotBeCalled();
     $this->moduleHandler->invokeAll(Argument::cetera())->shouldNotBeCalled();
 
     $this->configFactory->get(Argument::cetera())->shouldNotBeCalled();
@@ -716,7 +714,7 @@ class ConfigEntityStorageTest extends UnitTestCase {
    * @param array $methods
    *   (optional) The methods to mock.
    *
-   * @return \Drupal\Core\Entity\EntityInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @return \Drupal\Core\Entity\EntityInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   public function getMockEntity(array $values = [], $methods = []) {
     return $this->getMockForAbstractClass(ConfigEntityBase::class, [$values, 'test_entity_type'], '', TRUE, TRUE, TRUE, $methods);

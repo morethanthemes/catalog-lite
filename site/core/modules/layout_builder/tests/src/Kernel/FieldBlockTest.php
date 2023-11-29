@@ -10,6 +10,7 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FormatterPluginManager;
+use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\Form\EnforcedResponseException;
 use Drupal\Core\Plugin\Context\EntityContextDefinition;
 use Drupal\Core\Session\AccountInterface;
@@ -46,7 +47,7 @@ class FieldBlockTest extends EntityKernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->entityFieldManager = $this->prophesize(EntityFieldManagerInterface::class);
@@ -100,7 +101,7 @@ class FieldBlockTest extends EntityKernelTestBase {
     $entity->access('view', $account->reveal(), TRUE)->willReturn(AccessResult::allowed());
 
     $access = $block->access($account->reveal(), TRUE);
-    $this->assertSame(FALSE, $access->isAllowed());
+    $this->assertFalse($access->isAllowed());
   }
 
   /**
@@ -118,7 +119,7 @@ class FieldBlockTest extends EntityKernelTestBase {
     $entity->get('the_field_name')->shouldNotBeCalled();
 
     $access = $block->access($account->reveal(), TRUE);
-    $this->assertSame(FALSE, $access->isAllowed());
+    $this->assertFalse($access->isAllowed());
   }
 
   /**
@@ -151,7 +152,7 @@ class FieldBlockTest extends EntityKernelTestBase {
    * @covers ::build
    * @dataProvider providerTestBlockAccessEntityAllowedFieldHasValue
    */
-  public function testBlockAccessEntityAllowedFieldHasValue($expected, $is_empty) {
+  public function testBlockAccessEntityAllowedFieldHasValue($expected, $is_empty, $default_value) {
     $entity = $this->prophesize(FieldableEntityInterface::class);
     $block = $this->getTestBlock($entity);
 
@@ -159,6 +160,10 @@ class FieldBlockTest extends EntityKernelTestBase {
     $entity->access('view', $account->reveal(), TRUE)->willReturn(AccessResult::allowed());
     $entity->hasField('the_field_name')->willReturn(TRUE);
     $field = $this->prophesize(FieldItemListInterface::class);
+    $field_definition = $this->prophesize(FieldDefinitionInterface::class);
+    $field->getFieldDefinition()->willReturn($field_definition->reveal());
+    $field_definition->getDefaultValue($entity->reveal())->willReturn($default_value);
+    $field_definition->getType()->willReturn('not_an_image');
     $entity->get('the_field_name')->willReturn($field->reveal());
 
     $field->access('view', $account->reveal(), TRUE)->willReturn(AccessResult::allowed());
@@ -176,10 +181,17 @@ class FieldBlockTest extends EntityKernelTestBase {
     $data['empty'] = [
       FALSE,
       TRUE,
+      FALSE,
     ];
     $data['populated'] = [
       TRUE,
       FALSE,
+      FALSE,
+    ];
+    $data['empty, with default'] = [
+      TRUE,
+      TRUE,
+      TRUE,
     ];
     return $data;
   }
@@ -210,6 +222,7 @@ class FieldBlockTest extends EntityKernelTestBase {
       'bundles' => ['entity_test'],
       'context_definitions' => [
         'entity' => EntityContextDefinition::fromEntityTypeId('entity_test')->setLabel('Test'),
+        'view_mode' => new ContextDefinition('string'),
       ],
     ];
     $formatter_manager = $this->prophesize(FormatterPluginManager::class);
@@ -225,6 +238,7 @@ class FieldBlockTest extends EntityKernelTestBase {
       $this->logger->reveal()
     );
     $block->setContextValue('entity', $entity_prophecy->reveal());
+    $block->setContextValue('view_mode', 'default');
     return $block;
   }
 
@@ -258,7 +272,7 @@ class FieldBlockTest extends EntityKernelTestBase {
       ],
     ];
     if ($expected_markup) {
-      $expected['content']['#markup'] = $expected_markup;
+      $expected[0]['content']['#markup'] = $expected_markup;
     }
 
     $actual = $block->build();
@@ -278,13 +292,22 @@ class FieldBlockTest extends EntityKernelTestBase {
       new ReturnPromise([[]]),
       '',
     ];
-    $data['exception'] = [
-      new ThrowPromise(new \Exception('The exception message')),
+    return $data;
+  }
+
+  /**
+   * @covers ::build
+   */
+  public function testBuildException() {
+    // In PHP 7.4 ReflectionClass cannot be serialized so this cannot be part of
+    // providerTestBuild().
+    $promise = new ThrowPromise(new \Exception('The exception message'));
+    $this->testBuild(
+      $promise,
       '',
       'The field "%field" failed to render with the error of "%error".',
-      ['%field' => 'the_field_name', '%error' => 'The exception message'],
-    ];
-    return $data;
+      ['%field' => 'the_field_name', '%error' => 'The exception message']
+    );
   }
 
   /**
@@ -300,7 +323,7 @@ class FieldBlockTest extends EntityKernelTestBase {
     $entity->get('the_field_name')->willReturn($field->reveal());
 
     $block = $this->getTestBlock($entity);
-    $this->setExpectedException(EnforcedResponseException::class);
+    $this->expectException(EnforcedResponseException::class);
     $block->build();
   }
 

@@ -20,7 +20,7 @@ class ColorTest extends TestCase {
    * @param string $value
    *   The hex color value.
    *
-   * @dataProvider providerTestValidateHex()
+   * @dataProvider providerTestValidateHex
    */
   public function testValidateHex($expected, $value) {
     $this->assertSame($expected, Color::validateHex($value));
@@ -80,12 +80,7 @@ class ColorTest extends TestCase {
    */
   public function testHexToRgb($value, $expected, $invalid = FALSE) {
     if ($invalid) {
-      if (method_exists($this, 'expectException')) {
-        $this->expectException('InvalidArgumentException');
-      }
-      else {
-        $this->setExpectedException('InvalidArgumentException');
-      }
+      $this->expectException('InvalidArgumentException');
     }
     $this->assertSame($expected, Color::hexToRgb($value));
   }

@@ -36,12 +36,17 @@ class TermTranslationTest extends TaxonomyTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['taxonomy', 'language', 'content_translation'];
+  protected static $modules = ['taxonomy', 'language', 'content_translation'];
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected $defaultTheme = 'stark';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
     parent::setUp();
     $this->setupLanguages();
     $this->vocabulary = $this->createVocabulary();
@@ -51,7 +56,7 @@ class TermTranslationTest extends TaxonomyTestBase {
   }
 
   /**
-   * Test translated breadcrumbs.
+   * Tests translated breadcrumbs.
    */
   public function testTranslatedBreadcrumbs() {
     // Ensure non-translated breadcrumb is correct.
@@ -85,13 +90,14 @@ class TermTranslationTest extends TaxonomyTestBase {
   }
 
   /**
-   * Test translation of terms are showed in the node.
+   * Tests translation of terms are showed in the node.
    */
   public function testTermsTranslation() {
 
     // Set the display of the term reference field on the article content type
     // to "Check boxes/radio buttons".
-    entity_get_form_display('node', 'article', 'default')
+    \Drupal::service('entity_display.repository')
+      ->getFormDisplay('node', 'article')
       ->setComponent($this->termFieldName, [
         'type' => 'options_buttons',
       ])
@@ -100,15 +106,15 @@ class TermTranslationTest extends TaxonomyTestBase {
 
     // Test terms are listed.
     $this->drupalget('node/add/article');
-    $this->assertText('one');
-    $this->assertText('two');
-    $this->assertText('three');
+    $this->assertSession()->pageTextContains('one');
+    $this->assertSession()->pageTextContains('two');
+    $this->assertSession()->pageTextContains('three');
 
     // Test terms translated are listed.
     $this->drupalget('hu/node/add/article');
-    $this->assertText('translatedOne');
-    $this->assertText('translatedTwo');
-    $this->assertText('translatedThree');
+    $this->assertSession()->pageTextContains('translatedOne');
+    $this->assertSession()->pageTextContains('translatedTwo');
+    $this->assertSession()->pageTextContains('translatedThree');
   }
 
   /**

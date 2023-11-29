@@ -18,9 +18,9 @@ abstract class MultiWidthLayoutBase extends LayoutDefault implements PluginFormI
    * {@inheritdoc}
    */
   public function defaultConfiguration() {
-    $width_classes = array_keys($this->getWidthOptions());
-    return [
-      'column_widths' => array_shift($width_classes),
+    $configuration = parent::defaultConfiguration();
+    return $configuration + [
+      'column_widths' => $this->getDefaultWidth(),
     ];
   }
 
@@ -35,19 +35,14 @@ abstract class MultiWidthLayoutBase extends LayoutDefault implements PluginFormI
       '#options' => $this->getWidthOptions(),
       '#description' => $this->t('Choose the column widths for this layout.'),
     ];
-    return $form;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function validateConfigurationForm(array &$form, FormStateInterface $form_state) {
+    return parent::buildConfigurationForm($form, $form_state);
   }
 
   /**
    * {@inheritdoc}
    */
   public function submitConfigurationForm(array &$form, FormStateInterface $form_state) {
+    parent::submitConfigurationForm($form, $form_state);
     $this->configuration['column_widths'] = $form_state->getValue('column_widths');
   }
 
@@ -75,5 +70,17 @@ abstract class MultiWidthLayoutBase extends LayoutDefault implements PluginFormI
    *   the CSS classes and the values are the human readable labels.
    */
   abstract protected function getWidthOptions();
+
+  /**
+   * Provides a default value for the width options.
+   *
+   * @return string
+   *   A key from the array returned by ::getWidthOptions().
+   */
+  protected function getDefaultWidth() {
+    // Return the first available key from the list of options.
+    $width_classes = array_keys($this->getWidthOptions());
+    return array_shift($width_classes);
+  }
 
 }

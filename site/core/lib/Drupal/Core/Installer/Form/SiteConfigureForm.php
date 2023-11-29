@@ -2,12 +2,12 @@
 
 namespace Drupal\Core\Installer\Form;
 
+use Drupal\Core\Datetime\TimeZoneFormHelper;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Locale\CountryManagerInterface;
 use Drupal\Core\Site\Settings;
-use Drupal\Core\State\StateInterface;
 use Drupal\user\UserStorageInterface;
 use Drupal\user\UserInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -32,13 +32,6 @@ class SiteConfigureForm extends ConfigFormBase {
    * @var \Drupal\user\UserStorageInterface
    */
   protected $userStorage;
-
-  /**
-   * The state service.
-   *
-   * @var \Drupal\Core\State\StateInterface
-   */
-  protected $state;
 
   /**
    * The module installer.
@@ -70,18 +63,15 @@ class SiteConfigureForm extends ConfigFormBase {
    *   The site path.
    * @param \Drupal\user\UserStorageInterface $user_storage
    *   The user storage.
-   * @param \Drupal\Core\State\StateInterface $state
-   *   The state service.
    * @param \Drupal\Core\Extension\ModuleInstallerInterface $module_installer
    *   The module installer.
    * @param \Drupal\Core\Locale\CountryManagerInterface $country_manager
    *   The country manager.
    */
-  public function __construct($root, $site_path, UserStorageInterface $user_storage, StateInterface $state, ModuleInstallerInterface $module_installer, CountryManagerInterface $country_manager) {
+  public function __construct($root, $site_path, UserStorageInterface $user_storage, ModuleInstallerInterface $module_installer, CountryManagerInterface $country_manager) {
     $this->root = $root;
     $this->sitePath = $site_path;
     $this->userStorage = $user_storage;
-    $this->state = $state;
     $this->moduleInstaller = $module_installer;
     $this->countryManager = $country_manager;
   }
@@ -91,10 +81,9 @@ class SiteConfigureForm extends ConfigFormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('app.root'),
-      $container->get('site.path'),
-      $container->get('entity.manager')->getStorage('user'),
-      $container->get('state'),
+      $container->getParameter('app.root'),
+      $container->getParameter('site.path'),
+      $container->get('entity_type.manager')->getStorage('user'),
       $container->get('module_installer'),
       $container->get('country_manager')
     );
@@ -137,7 +126,7 @@ class SiteConfigureForm extends ConfigFormBase {
     // successfully.)
     $post_params = $this->getRequest()->request->all();
     if (empty($post_params) && (Settings::get('skip_permissions_hardening') || !drupal_verify_install_file($this->root . '/' . $settings_file, FILE_EXIST | FILE_READABLE | FILE_NOT_WRITABLE) || !drupal_verify_install_file($this->root . '/' . $settings_dir, FILE_NOT_WRITABLE, 'dir'))) {
-      $this->messenger()->addWarning(t('All necessary changes to %dir and %file have been made, so you should remove write permissions to them now in order to avoid security risks. If you are unsure how to do so, consult the <a href=":handbook_url">online handbook</a>.', ['%dir' => $settings_dir, '%file' => $settings_file, ':handbook_url' => 'https://www.drupal.org/server-permissions']));
+      $this->messenger()->addWarning($this->t('All necessary changes to %dir and %file have been made, so you should remove write permissions to them now in order to avoid security risks. If you are unsure how to do so, consult the <a href=":handbook_url">online handbook</a>.', ['%dir' => $settings_dir, '%file' => $settings_file, ':handbook_url' => 'https://www.drupal.org/server-permissions']));
     }
 
     $form['#attached']['library'][] = 'system/drupal.system';
@@ -219,7 +208,7 @@ class SiteConfigureForm extends ConfigFormBase {
       '#type' => 'select',
       '#title' => $this->t('Default time zone'),
       '#default_value' => $default_timezone,
-      '#options' => system_time_zones(NULL, TRUE),
+      '#options' => TimeZoneFormHelper::getOptionsListByRegion(),
       '#weight' => 5,
       '#attributes' => ['class' => ['timezone-detect']],
       '#access' => empty($install_state['config_install_path']),
@@ -313,9 +302,6 @@ class SiteConfigureForm extends ConfigFormBase {
     $account->pass = $account_values['pass'];
     $account->name = $account_values['name'];
     $account->save();
-
-    // Record when this install ran.
-    $this->state->set('install_time', $_SERVER['REQUEST_TIME']);
   }
 
 }

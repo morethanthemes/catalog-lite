@@ -27,21 +27,21 @@ class FileMoveTest extends FileTestBase {
     /** @var \Drupal\Core\File\FileSystemInterface $file_system */
     $file_system = \Drupal::service('file_system');
     $new_filepath = $file_system->move($uri, $desired_filepath, FileSystemInterface::EXISTS_ERROR);
-    $this->assertTrue($new_filepath, 'Move was successful.');
-    $this->assertEqual($new_filepath, $desired_filepath, 'Returned expected filepath.');
-    $this->assertTrue(file_exists($new_filepath), 'File exists at the new location.');
-    $this->assertFalse(file_exists($uri), 'No file remains at the old location.');
+    $this->assertNotFalse($new_filepath, 'Move was successful.');
+    $this->assertEquals($desired_filepath, $new_filepath, 'Returned expected filepath.');
+    $this->assertFileExists($new_filepath);
+    $this->assertFileDoesNotExist($uri);
     $this->assertFilePermissions($new_filepath, Settings::get('file_chmod_file', FileSystem::CHMOD_FILE));
 
     // Moving with rename.
     $desired_filepath = 'public://' . $this->randomMachineName();
-    $this->assertTrue(file_exists($new_filepath), 'File exists before moving.');
-    $this->assertTrue(file_put_contents($desired_filepath, ' '), 'Created a file so a rename will have to happen.');
+    $this->assertFileExists($new_filepath);
+    $this->assertNotFalse(file_put_contents($desired_filepath, ' '), 'Created a file so a rename will have to happen.');
     $newer_filepath = $file_system->move($new_filepath, $desired_filepath, FileSystemInterface::EXISTS_RENAME);
-    $this->assertTrue($newer_filepath, 'Move was successful.');
-    $this->assertNotEqual($newer_filepath, $desired_filepath, 'Returned expected filepath.');
-    $this->assertTrue(file_exists($newer_filepath), 'File exists at the new location.');
-    $this->assertFalse(file_exists($new_filepath), 'No file remains at the old location.');
+    $this->assertNotFalse($newer_filepath, 'Move was successful.');
+    $this->assertNotEquals($desired_filepath, $newer_filepath, 'Returned expected filepath.');
+    $this->assertFileExists($newer_filepath);
+    $this->assertFileDoesNotExist($new_filepath);
     $this->assertFilePermissions($newer_filepath, Settings::get('file_chmod_file', FileSystem::CHMOD_FILE));
 
     // TODO: test moving to a directory (rather than full directory/file path)
@@ -53,7 +53,7 @@ class FileMoveTest extends FileTestBase {
    */
   public function testMissing() {
     // Move non-existent file.
-    $this->setExpectedException(FileNotExistsException::class);
+    $this->expectException(FileNotExistsException::class);
     \Drupal::service('file_system')->move($this->randomMachineName(), $this->randomMachineName());
   }
 
@@ -67,16 +67,16 @@ class FileMoveTest extends FileTestBase {
     // Move the file onto itself without renaming shouldn't make changes.
     /** @var \Drupal\Core\File\FileSystemInterface $file_system */
     $file_system = \Drupal::service('file_system');
-    $this->setExpectedException(FileException::class);
+    $this->expectException(FileException::class);
     $new_filepath = $file_system->move($uri, $uri, FileSystemInterface::EXISTS_REPLACE);
     $this->assertFalse($new_filepath, 'Moving onto itself without renaming fails.');
-    $this->assertTrue(file_exists($uri), 'File exists after moving onto itself.');
+    $this->assertFileExists($uri);
 
     // Move the file onto itself with renaming will result in a new filename.
     $new_filepath = $file_system->move($uri, $uri, FileSystemInterface::EXISTS_RENAME);
-    $this->assertTrue($new_filepath, 'Moving onto itself with renaming works.');
-    $this->assertFalse(file_exists($uri), 'Original file has been removed.');
-    $this->assertTrue(file_exists($new_filepath), 'File exists after moving onto itself.');
+    $this->assertNotFalse($new_filepath, 'Moving onto itself with renaming works.');
+    $this->assertFileDoesNotExist($uri);
+    $this->assertFileExists($new_filepath);
   }
 
 }

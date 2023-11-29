@@ -17,7 +17,7 @@ class UserBulkFormTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function tearDown() {
+  protected function tearDown(): void {
     parent::tearDown();
     $container = new ContainerBuilder();
     \Drupal::setContainer($container);
@@ -30,35 +30,35 @@ class UserBulkFormTest extends UnitTestCase {
     $actions = [];
 
     for ($i = 1; $i <= 2; $i++) {
-      $action = $this->getMock('\Drupal\system\ActionConfigEntityInterface');
+      $action = $this->createMock('\Drupal\system\ActionConfigEntityInterface');
       $action->expects($this->any())
         ->method('getType')
-        ->will($this->returnValue('user'));
+        ->willReturn('user');
       $actions[$i] = $action;
     }
 
-    $action = $this->getMock('\Drupal\system\ActionConfigEntityInterface');
+    $action = $this->createMock('\Drupal\system\ActionConfigEntityInterface');
     $action->expects($this->any())
       ->method('getType')
-      ->will($this->returnValue('node'));
+      ->willReturn('node');
     $actions[] = $action;
 
-    $entity_storage = $this->getMock('Drupal\Core\Entity\EntityStorageInterface');
+    $entity_storage = $this->createMock('Drupal\Core\Entity\EntityStorageInterface');
     $entity_storage->expects($this->any())
       ->method('loadMultiple')
-      ->will($this->returnValue($actions));
+      ->willReturn($actions);
 
     $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
     $entity_type_manager->expects($this->once())
       ->method('getStorage')
       ->with('action')
-      ->will($this->returnValue($entity_storage));
+      ->willReturn($entity_storage);
 
     $entity_repository = $this->createMock(EntityRepositoryInterface::class);
 
-    $language_manager = $this->getMock('Drupal\Core\Language\LanguageManagerInterface');
+    $language_manager = $this->createMock('Drupal\Core\Language\LanguageManagerInterface');
 
-    $messenger = $this->getMock('Drupal\Core\Messenger\MessengerInterface');
+    $messenger = $this->createMock('Drupal\Core\Messenger\MessengerInterface');
 
     $views_data = $this->getMockBuilder('Drupal\views\ViewsData')
       ->disableOriginalConstructor()
@@ -66,17 +66,17 @@ class UserBulkFormTest extends UnitTestCase {
     $views_data->expects($this->any())
       ->method('get')
       ->with('users')
-      ->will($this->returnValue(['table' => ['entity type' => 'user']]));
+      ->willReturn(['table' => ['entity type' => 'user']]);
     $container = new ContainerBuilder();
     $container->set('views.views_data', $views_data);
     $container->set('string_translation', $this->getStringTranslationStub());
     \Drupal::setContainer($container);
 
-    $storage = $this->getMock('Drupal\views\ViewEntityInterface');
+    $storage = $this->createMock('Drupal\views\ViewEntityInterface');
     $storage->expects($this->any())
       ->method('get')
       ->with('base_table')
-      ->will($this->returnValue('users'));
+      ->willReturn('users');
 
     $executable = $this->getMockBuilder('Drupal\views\ViewExecutable')
       ->disableOriginalConstructor()
@@ -93,7 +93,8 @@ class UserBulkFormTest extends UnitTestCase {
     $user_bulk_form = new UserBulkForm([], 'user_bulk_form', $definition, $entity_type_manager, $language_manager, $messenger, $entity_repository);
     $user_bulk_form->init($executable, $display, $options);
 
-    $this->assertAttributeEquals(array_slice($actions, 0, -1, TRUE), 'actions', $user_bulk_form);
+    $reflected_actions = (new \ReflectionObject($user_bulk_form))->getProperty('actions');
+    $this->assertEquals(array_slice($actions, 0, -1, TRUE), $reflected_actions->getValue($user_bulk_form));
   }
 
 }

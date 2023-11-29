@@ -4,6 +4,7 @@ namespace Drupal\KernelTests\Core\Extension;
 
 use Drupal\Core\Database\Database;
 use Drupal\Core\Extension\MissingDependencyException;
+use Drupal\Core\Extension\Exception\ObsoleteExtensionException;
 use Drupal\KernelTests\KernelTestBase;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
@@ -15,15 +16,6 @@ use Symfony\Component\Routing\Exception\RouteNotFoundException;
  * @group Extension
  */
 class ModuleInstallerTest extends KernelTestBase {
-
-  /**
-   * Modules to install.
-   *
-   * The System module is required because system_rebuild_module_data() is used.
-   *
-   * @var array
-   */
-  public static $modules = ['system'];
 
   /**
    * Tests that routes are rebuilt during install and uninstall of modules.
@@ -41,7 +33,7 @@ class ModuleInstallerTest extends KernelTestBase {
     $this->assertEquals('/router_test/test1', $route->getPath());
 
     $this->container->get('module_installer')->uninstall(['router_test']);
-    $this->setExpectedException(RouteNotFoundException::class);
+    $this->expectException(RouteNotFoundException::class);
     $this->container->get('router.route_provider')->getRouteByName('router_test.1');
   }
 
@@ -102,23 +94,16 @@ class ModuleInstallerTest extends KernelTestBase {
    * @covers ::install
    */
   public function testInvalidCoreInstall($module_name, $install_dependencies) {
-    $this->setExpectedException(MissingDependencyException::class, "Unable to install modules: module '$module_name' is incompatible with this version of Drupal core.");
+    $this->expectException(MissingDependencyException::class);
+    $this->expectExceptionMessage("Unable to install modules: module '$module_name' is incompatible with this version of Drupal core.");
     $this->container->get('module_installer')->install([$module_name], $install_dependencies);
   }
 
   /**
-   * Dataprovider for testInvalidCoreInstall().
+   * Data provider for testInvalidCoreInstall().
    */
   public function providerTestInvalidCoreInstall() {
     return [
-      'no dependencies system_incompatible_core_version_test_1x' => [
-        'system_incompatible_core_version_test_1x',
-        FALSE,
-      ],
-      'install_dependencies system_incompatible_core_version_test_1x' => [
-        'system_incompatible_core_version_test_1x',
-        TRUE,
-      ],
       'no dependencies system_core_incompatible_semver_test' => [
         'system_core_incompatible_semver_test',
         FALSE,
@@ -136,7 +121,8 @@ class ModuleInstallerTest extends KernelTestBase {
    * @covers ::install
    */
   public function testDependencyInvalidCoreInstall() {
-    $this->setExpectedException(MissingDependencyException::class, "Unable to install modules: module 'system_incompatible_core_version_dependencies_test'. Its dependency module 'system_incompatible_core_version_test' is incompatible with this version of Drupal core.");
+    $this->expectException(MissingDependencyException::class);
+    $this->expectExceptionMessage("Unable to install modules: module 'system_incompatible_core_version_dependencies_test'. Its dependency module 'system_core_incompatible_semver_test' is incompatible with this version of Drupal core.");
     $this->container->get('module_installer')->install(['system_incompatible_core_version_dependencies_test']);
   }
 
@@ -147,6 +133,30 @@ class ModuleInstallerTest extends KernelTestBase {
    */
   public function testDependencyInvalidCoreInstallNoDependencies() {
     $this->assertTrue($this->container->get('module_installer')->install(['system_incompatible_core_version_dependencies_test'], FALSE));
+  }
+
+  /**
+   * Tests trying to install an obsolete module.
+   *
+   * @covers ::install
+   */
+  public function testObsoleteInstall() {
+    $this->expectException(ObsoleteExtensionException::class);
+    $this->expectExceptionMessage("Unable to install modules: module 'system_status_obsolete_test' is obsolete.");
+    $this->container->get('module_installer')->install(['system_status_obsolete_test']);
+  }
+
+  /**
+   * Tests trying to install a deprecated module.
+   *
+   * @covers ::install
+   *
+   * @group legacy
+   */
+  public function testDeprecatedInstall() {
+    $this->expectDeprecation("The module 'deprecated_module' is deprecated. See http://example.com/deprecated");
+    \Drupal::service('module_installer')->install(['deprecated_module']);
+    $this->assertTrue(\Drupal::service('module_handler')->moduleExists('deprecated_module'));
   }
 
 }

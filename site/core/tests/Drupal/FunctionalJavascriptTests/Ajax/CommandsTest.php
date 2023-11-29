@@ -14,7 +14,12 @@ class CommandsTest extends WebDriverTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['node', 'ajax_test', 'ajax_forms_test'];
+  protected static $modules = ['node', 'ajax_test', 'ajax_forms_test'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * Tests the various Ajax Commands.
@@ -136,17 +141,38 @@ JS;
   }
 
   /**
+   * Tests the various Ajax Commands with legacy parameters.
+   * @group legacy
+   */
+  public function testLegacyAjaxCommands() {
+    $session = $this->getSession();
+    $page = $this->getSession()->getPage();
+
+    $form_path = 'ajax_forms_test_ajax_commands_form';
+    $web_user = $this->drupalCreateUser(['access content']);
+    $this->drupalLogin($web_user);
+    $this->drupalGet($form_path);
+
+    // Tests the 'add_css' command with legacy string value.
+    $this->expectDeprecation('Javascript Deprecation: Passing a string to the Drupal.ajax.add_css() method is deprecated in 10.1.0 and is removed from drupal:11.0.0. See https://www.drupal.org/node/3154948.');
+    $page->pressButton("AJAX 'add_css' legacy command");
+    $this->assertWaitPageContains('my/file.css');
+  }
+
+  /**
    * Asserts that page contains a text after waiting.
    *
    * @param string $text
    *   A needle text.
+   *
+   * @internal
    */
-  protected function assertWaitPageContains($text) {
+  protected function assertWaitPageContains(string $text): void {
     $page = $this->getSession()->getPage();
     $page->waitFor(10, function () use ($page, $text) {
       return stripos($page->getContent(), $text) !== FALSE;
     });
-    $this->assertContains($text, $page->getContent());
+    $this->assertStringContainsString($text, $page->getContent());
   }
 
 }

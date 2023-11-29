@@ -42,6 +42,8 @@ class Transaction {
    *
    * This is used to label the transaction savepoint. It will be overridden to
    * 'drupal_transaction' if there is no transaction depth.
+   *
+   * @var string
    */
   protected $name;
 
@@ -82,12 +84,10 @@ class Transaction {
    *
    * This is just a wrapper method to rollback whatever transaction stack we are
    * currently in, which is managed by the connection object itself. Note that
-   * logging (preferable with watchdog_exception()) needs to happen after a
-   * transaction has been rolled back or the log messages will be rolled back
-   * too.
+   * logging needs to happen after a transaction has been rolled back or the log
+   * messages will be rolled back too.
    *
    * @see \Drupal\Core\Database\Connection::rollBack()
-   * @see watchdog_exception()
    */
   public function rollBack() {
     $this->rolledBack = TRUE;

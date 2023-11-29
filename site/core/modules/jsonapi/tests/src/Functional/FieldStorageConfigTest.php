@@ -10,12 +10,17 @@ use Drupal\field\Entity\FieldStorageConfig;
  *
  * @group jsonapi
  */
-class FieldStorageConfigTest extends ResourceTestBase {
+class FieldStorageConfigTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['node'];
+  protected static $modules = ['node', 'field_ui'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -107,6 +112,7 @@ class FieldStorageConfigTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
   /**

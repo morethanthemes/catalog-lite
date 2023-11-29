@@ -27,6 +27,13 @@ class BlockRepository implements BlockRepositoryInterface {
   protected $themeManager;
 
   /**
+   * The context handler.
+   *
+   * @var \Drupal\Core\Plugin\Context\ContextHandlerInterface
+   */
+  protected $contextHandler;
+
+  /**
    * Constructs a new BlockRepository.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
@@ -71,9 +78,7 @@ class BlockRepository implements BlockRepositoryInterface {
     // Merge it with the actual values to maintain the region ordering.
     $assignments = array_intersect_key(array_merge($empty, $full), $empty);
     foreach ($assignments as &$assignment) {
-      // Suppress errors because PHPUnit will indirectly modify the contents,
-      // triggering https://bugs.php.net/bug.php?id=50688.
-      @uasort($assignment, 'Drupal\block\Entity\Block::sort');
+      uasort($assignment, 'Drupal\block\Entity\Block::sort');
     }
     return $assignments;
   }

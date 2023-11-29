@@ -11,13 +11,13 @@ use Drupal\Tests\jsonapi\Kernel\JsonapiKernelTestBase;
 /**
  * @coversDefaultClass \Drupal\jsonapi\Context\FieldResolver
  * @group jsonapi
- * @group legacy
+ * @group #slow
  *
  * @internal
  */
 class FieldResolverTest extends JsonapiKernelTestBase {
 
-  public static $modules = [
+  protected static $modules = [
     'entity_test',
     'jsonapi_test_field_aliasing',
     'jsonapi_test_field_filter_access',
@@ -44,7 +44,7 @@ class FieldResolverTest extends JsonapiKernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->installEntitySchema('entity_test_with_bundle');
@@ -127,7 +127,10 @@ class FieldResolverTest extends JsonapiKernelTestBase {
    */
   public function testResolveInternalIncludePathError($entity_type, $bundle, $external_path, $expected_message = '') {
     $path_parts = explode('.', $external_path);
-    $this->setExpectedException(CacheableBadRequestHttpException::class, $expected_message);
+    $this->expectException(CacheableBadRequestHttpException::class);
+    if (!empty($expected_message)) {
+      $this->expectExceptionMessage($expected_message);
+    }
     $resource_type = $this->resourceTypeRepository->get($entity_type, $bundle);
     $this->sut->resolveInternalIncludePath($resource_type, $path_parts);
   }
@@ -166,7 +169,8 @@ class FieldResolverTest extends JsonapiKernelTestBase {
    * @dataProvider resolveInternalEntityQueryPathProvider
    */
   public function testResolveInternalEntityQueryPath($expect, $external_path, $entity_type_id = 'entity_test_with_bundle', $bundle = 'bundle1') {
-    $this->assertEquals($expect, $this->sut->resolveInternalEntityQueryPath($entity_type_id, $bundle, $external_path));
+    $resource_type = $this->resourceTypeRepository->get($entity_type_id, $bundle);
+    $this->assertEquals($expect, $this->sut->resolveInternalEntityQueryPath($resource_type, $external_path));
   }
 
   /**
@@ -246,8 +250,12 @@ class FieldResolverTest extends JsonapiKernelTestBase {
    * @dataProvider resolveInternalEntityQueryPathErrorProvider
    */
   public function testResolveInternalEntityQueryPathError($entity_type, $bundle, $external_path, $expected_message = '') {
-    $this->setExpectedException(CacheableBadRequestHttpException::class, $expected_message);
-    $this->sut->resolveInternalEntityQueryPath($entity_type, $bundle, $external_path);
+    $this->expectException(CacheableBadRequestHttpException::class);
+    if (!empty($expected_message)) {
+      $this->expectExceptionMessage($expected_message);
+    }
+    $resource_type = $this->resourceTypeRepository->get($entity_type, $bundle);
+    $this->sut->resolveInternalEntityQueryPath($resource_type, $external_path);
   }
 
   /**
@@ -301,17 +309,17 @@ class FieldResolverTest extends JsonapiKernelTestBase {
       'entity reference then no delta with property specifier `target_id`' => [
         'entity_test_with_bundle', 'bundle1',
         'field_test_ref1.target_id',
-        'Invalid nested filtering. The property `target_id`, given in the path `field_test_ref1.target_id`, does not exist. Filter by `field_test_ref1`, not `field_test_ref1.target_id` (the JSON:API module elides property names from single-property fields).',
+        'Invalid nested filtering. The field `target_id`, given in the path `field_test_ref1.target_id`, does not exist.',
       ],
       'entity reference then delta 0 with property specifier `target_id`' => [
         'entity_test_with_bundle', 'bundle1',
         'field_test_ref1.0.target_id',
-        'Invalid nested filtering. The property `target_id`, given in the path `field_test_ref1.0.target_id`, does not exist. Filter by `field_test_ref1.0`, not `field_test_ref1.0.target_id` (the JSON:API module elides property names from single-property fields).',
+        'Invalid nested filtering. The field `target_id`, given in the path `field_test_ref1.0.target_id`, does not exist.',
       ],
       'entity reference then delta 1 with property specifier `target_id`' => [
         'entity_test_with_bundle', 'bundle1',
         'field_test_ref1.1.target_id',
-        'Invalid nested filtering. The property `target_id`, given in the path `field_test_ref1.1.target_id`, does not exist. Filter by `field_test_ref1.1`, not `field_test_ref1.1.target_id` (the JSON:API module elides property names from single-property fields).',
+        'Invalid nested filtering. The field `target_id`, given in the path `field_test_ref1.1.target_id`, does not exist.',
       ],
 
       'entity reference then no reference property then a complex field' => [

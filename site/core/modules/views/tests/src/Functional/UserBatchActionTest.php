@@ -17,13 +17,22 @@ class UserBatchActionTest extends BrowserTestBase {
    *
    * @var array
    */
-  public static $modules = ['user', 'user_batch_action_test', 'views'];
+  protected static $modules = [
+    'user',
+    'user_batch_action_test',
+    'views',
+  ];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * Tests user admin batch.
    */
   public function testUserAction() {
-    $themes = ['classy', 'seven', 'bartik', 'test_subseven'];
+    $themes = ['stark', 'olivero', 'claro'];
     $this->container->get('theme_installer')->install($themes);
 
     $this->drupalLogin($this->rootUser);
@@ -35,7 +44,7 @@ class UserBatchActionTest extends BrowserTestBase {
         'user_bulk_form[0]' => TRUE,
         'action' => 'user_batch_action_test_action',
       ];
-      $this->drupalPostForm(NULL, $edit, t('Apply'));
+      $this->submitForm($edit, 'Apply');
       $this->assertSession()->pageTextContains('One item has been processed.');
       $this->assertSession()->pageTextContains($theme . ' theme used');
     }

@@ -21,7 +21,7 @@ class MediaAccessTest extends MediaFunctionalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = [
+  protected static $modules = [
     'block',
     'media_test_source',
   ];
@@ -29,14 +29,19 @@ class MediaAccessTest extends MediaFunctionalTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected $defaultTheme = 'stark';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
     parent::setUp();
     // This is needed to provide the user cache context for a below assertion.
     $this->drupalPlaceBlock('local_tasks_block');
   }
 
   /**
-   * Test some access control functionality.
+   * Tests some access control functionality.
    */
   public function testMediaAccess() {
     $assert_session = $this->assertSession();
@@ -178,17 +183,19 @@ class MediaAccessTest extends MediaFunctionalTestBase {
     $this->drupalGet('admin/content');
     $assert_session->linkByHrefExists('/admin/content/media');
     $this->clickLink('Media');
-    $this->assertCacheContext('user.permissions');
+    $this->assertCacheContext('user');
     $assert_session->statusCodeEquals(200);
-    $assert_session->elementExists('css', '.view-media');
-    $assert_session->pageTextContains($this->loggedInUser->getDisplayName());
-    $assert_session->pageTextContains($this->nonAdminUser->getDisplayName());
-    $assert_session->linkByHrefExists('/media/' . $media->id());
-    $assert_session->linkByHrefExists('/media/' . $user_media->id());
+    $assert_session->elementExists('css', '.views-element-container');
+    // First row of the View contains media created by admin user.
+    $assert_session->elementTextEquals('xpath', '//div[@class="views-element-container"]//tbody/tr[1]/td[contains(@class, "views-field-uid")]/a', $this->adminUser->getDisplayName());
+    $assert_session->elementTextEquals('xpath', "//div[@class='views-element-container']//tbody/tr[1]/td[contains(@class, 'views-field-name')]/a[contains(@href, '/media/{$media->id()}')]", 'Unnamed');
+    // Second row of the View contains media created by non-admin user.
+    $assert_session->elementTextEquals('xpath', '//div[@class="views-element-container"]//tbody/tr[2]/td[contains(@class, "views-field-uid")]/a', $this->nonAdminUser->getDisplayName());
+    $assert_session->elementTextEquals('xpath', "//div[@class='views-element-container']//tbody/tr[2]/td[contains(@class, 'views-field-name')]/a[contains(@href, '/media/{$user_media->id()}')]", 'Unnamed');
   }
 
   /**
-   * Test view access control on the canonical page.
+   * Tests view access control on the canonical page.
    */
   public function testCanonicalMediaAccess() {
     $media_type = $this->createMediaType('test');
@@ -323,7 +330,7 @@ class MediaAccessTest extends MediaFunctionalTestBase {
 
     $this->container->get('router.builder')->rebuild();
 
-    // Create a media type and a entity reference to itself.
+    // Create a media type and an entity reference to itself.
     $media_type = $this->createMediaType('test');
 
     FieldStorageConfig::create([
@@ -366,7 +373,7 @@ class MediaAccessTest extends MediaFunctionalTestBase {
     ]);
     $media_parent->save();
 
-    entity_get_display('media', $media_type->id(), 'full')
+    \Drupal::service('entity_display.repository')->getViewDisplay('media', $media_type->id(), 'full')
       ->set('content', [])
       ->setComponent('title', ['type' => 'string'])
       ->setComponent('field_reference', [

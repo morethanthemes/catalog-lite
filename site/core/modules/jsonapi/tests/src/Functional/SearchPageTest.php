@@ -10,12 +10,17 @@ use Drupal\search\Entity\SearchPage;
  *
  * @group jsonapi
  */
-class SearchPageTest extends ResourceTestBase {
+class SearchPageTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['node', 'search'];
+  protected static $modules = ['node', 'search'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -114,6 +119,7 @@ class SearchPageTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
   /**

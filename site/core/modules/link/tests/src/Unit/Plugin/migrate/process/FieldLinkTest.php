@@ -14,17 +14,17 @@ use Drupal\Tests\UnitTestCase;
 class FieldLinkTest extends UnitTestCase {
 
   /**
-   * Test the url transformations in the FieldLink process plugin.
+   * Tests the URL transformations in the FieldLink process plugin.
    *
    * @dataProvider canonicalizeUriDataProvider
    */
   public function testCanonicalizeUri($url, $expected, $configuration = []) {
-    $link_plugin = new FieldLink($configuration, '', [], $this->getMock(MigrationInterface::class));
+    $link_plugin = new FieldLink($configuration, '', [], $this->createMock(MigrationInterface::class));
     $transformed = $link_plugin->transform([
       'url' => $url,
       'title' => '',
       'attributes' => serialize([]),
-    ], $this->getMock(MigrateExecutableInterface::class), $this->getMockBuilder(Row::class)->disableOriginalConstructor()->getMock(), NULL);
+    ], $this->createMock(MigrateExecutableInterface::class), $this->getMockBuilder(Row::class)->disableOriginalConstructor()->getMock(), NULL);
     $this->assertEquals($expected, $transformed['uri']);
   }
 
@@ -66,6 +66,10 @@ class FieldLinkTest extends UnitTestCase {
         'https://yahoo.com',
         ['uri_scheme' => 'https://'],
       ],
+      'Absolute URL without explicit protocol (protocol-relative)' => [
+        '//example.com',
+        'http://example.com',
+      ],
       'Absolute URL with non-standard characters' => [
         'http://www.ßÀÑÐ¥ƒå¢ë.com',
         'http://www.ßÀÑÐ¥ƒå¢ë.com',
@@ -86,15 +90,27 @@ class FieldLinkTest extends UnitTestCase {
         'http://www.example.com/page#links',
         'http://www.example.com/page#links',
       ],
+      'empty' => [
+        '',
+        'route:<nolink>',
+      ],
+      'No link' => [
+        '<nolink>',
+        'route:<nolink>',
+      ],
+      'none' => [
+        '<none>',
+        'route:<nolink>',
+      ],
     ];
   }
 
   /**
-   * Test the attributes that are deeply serialized are discarded.
+   * Tests the attributes that are deeply serialized are discarded.
    */
   public function testCanonicalizeUriSerialized() {
-    $link_plugin = new FieldLink([], '', [], $this->getMock(MigrationInterface::class));
-    $migrate_executable = $this->getMock(MigrateExecutableInterface::class);
+    $link_plugin = new FieldLink([], '', [], $this->createMock(MigrationInterface::class));
+    $migrate_executable = $this->createMock(MigrateExecutableInterface::class);
     $row = new Row();
 
     $transformed = $link_plugin->transform([

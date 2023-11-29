@@ -7,6 +7,10 @@ use Drupal\Component\Utility\UrlHelper;
 use Drupal\Component\Utility\Xss;
 use PHPUnit\Framework\TestCase;
 
+// cspell:ignore ascript barbaz ckers cript CVEs dynsrc fooÿñ metacharacters
+// cspell:ignore msgbox ncript nfocus nmedi nosuchscheme nosuchtag onmediaerror
+// cspell:ignore scrscriptipt tascript vbscript
+
 /**
  * XSS Filtering tests.
  *
@@ -19,13 +23,15 @@ use PHPUnit\Framework\TestCase;
  * Relevant CVEs:
  * - CVE-2002-1806, ~CVE-2005-0682, ~CVE-2005-2106, CVE-2005-3973,
  *   CVE-2006-1226 (= rev. 1.112?), CVE-2008-0273, CVE-2008-3740.
+ *
+ * @runTestsInSeparateProcesses
  */
 class XssTest extends TestCase {
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $allowed_protocols = [
@@ -82,7 +88,7 @@ class XssTest extends TestCase {
    *     - The value to filter.
    *     - The value to expect after filtering.
    *     - The assertion message.
-   *     - (optional) The allowed HTML HTML tags array that should be passed to
+   *     - (optional) The allowed HTML tags array that should be passed to
    *       \Drupal\Component\Utility\Xss::filter().
    */
   public function providerTestFilterXssNormalized() {
@@ -149,7 +155,7 @@ class XssTest extends TestCase {
    *     - The value to filter.
    *     - The value to expect that's missing after filtering.
    *     - The assertion message.
-   *     - (optional) The allowed HTML HTML tags array that should be passed to
+   *     - (optional) The allowed HTML tags array that should be passed to
    *       \Drupal\Component\Utility\Xss::filter().
    */
   public function providerTestFilterXssNotNormalized() {
@@ -247,7 +253,7 @@ class XssTest extends TestCase {
       [
         '<blockquote><script>alert(0)</script></blockquote>',
         'script',
-        'HTML tag stripping evasion -- script in a blockqoute.',
+        'HTML tag stripping evasion -- script in a blockquote.',
         ['blockquote'],
       ],
       [
@@ -427,16 +433,6 @@ class XssTest extends TestCase {
         ['p'],
       ],
     ];
-    // @fixme This dataset currently fails under 5.4 because of
-    //   https://www.drupal.org/node/1210798. Restore after its fixed.
-    if (version_compare(PHP_VERSION, '5.4.0', '<')) {
-      $cases[] = [
-        '<img src=" &#14;  javascript:alert(0)">',
-        'javascript',
-        'HTML scheme clearing evasion -- spaces and metacharacters before scheme.',
-        ['img'],
-      ];
-    }
     return $cases;
   }
 
@@ -480,7 +476,7 @@ class XssTest extends TestCase {
    */
   public function testQuestionSign() {
     $value = Xss::filter('<?xml:namespace ns="urn:schemas-microsoft-com:time">');
-    $this->assertTrue(stripos($value, '<?xml') === FALSE, 'HTML tag stripping evasion -- starting with a question sign (processing instructions).');
+    $this->assertStringNotContainsStringIgnoringCase('<?xml', $value, 'HTML tag stripping evasion -- starting with a question sign (processing instructions).');
   }
 
   /**
@@ -500,8 +496,8 @@ class XssTest extends TestCase {
   public function providerTestAttributes() {
     return [
       [
-        '<img src="http://example.com/foo.jpg" title="Example: title" alt="Example: alt">',
-        '<img src="http://example.com/foo.jpg" title="Example: title" alt="Example: alt">',
+        '<img src="http://example.com/foo.jpg" title="Example: title" alt="Example: alt" class="md:block">',
+        '<img src="http://example.com/foo.jpg" title="Example: title" alt="Example: alt" class="md:block">',
         'Image tag with alt and title attribute',
         ['img'],
       ],
@@ -529,6 +525,42 @@ class XssTest extends TestCase {
         'Link tag with numeric data attribute',
         ['a'],
       ],
+      [
+        '<img src= onmouseover="script(\'alert\');">',
+        '<img>',
+        'Image tag with malformed SRC',
+        ['img'],
+      ],
+      [
+        'Body"></iframe><img/src="x"/onerror="alert(document.domain)"/><"',
+        'Body"&gt;<img />&lt;"',
+        'Image tag with malformed SRC',
+        ['img'],
+      ],
+      [
+        '<img/src="x"/onerror="alert(document.domain)"/>',
+        '<img />',
+        'Image tag with malformed SRC',
+        ['img'],
+      ],
+      [
+        '<del datetime="1789-08-22T12:30:00.1-04:00">deleted text</del>',
+        '<del datetime="1789-08-22T12:30:00.1-04:00">deleted text</del>',
+        'Del with datetime attribute',
+        ['del'],
+      ],
+      [
+        '<ins datetime="1986-01-28 11:38:00.010">inserted text</ins>',
+        '<ins datetime="1986-01-28 11:38:00.010">inserted text</ins>',
+        'Ins with datetime attribute',
+        ['ins'],
+      ],
+      [
+        '<time datetime="1978-11-19T05:00:00Z">#DBD</time>',
+        '<time datetime="1978-11-19T05:00:00Z">#DBD</time>',
+        'Time with datetime attribute',
+        ['time'],
+      ],
     ];
   }
 
@@ -537,7 +569,7 @@ class XssTest extends TestCase {
    */
   public function testFilterXSSAdmin() {
     $value = Xss::filterAdmin('<style /><iframe /><frame /><frameset /><meta /><link /><embed /><applet /><param /><layer />');
-    $this->assertEquals($value, '', 'Admin HTML filter -- should never allow some tags.');
+    $this->assertEquals('', $value, 'Admin HTML filter -- should never allow some tags.');
   }
 
   /**
@@ -579,7 +611,7 @@ class XssTest extends TestCase {
    * Asserts that a text transformed to lowercase with HTML entities decoded does contain a given string.
    *
    * Otherwise fails the test with a given message, similar to all the
-   * SimpleTest assert* functions.
+   * PHPUnit assert* functions.
    *
    * Note that this does not remove nulls, new lines and other characters that
    * could be used to obscure a tag or an attribute name.
@@ -590,18 +622,18 @@ class XssTest extends TestCase {
    *   Lowercase, plain text to look for.
    * @param string $message
    *   (optional) Message to display if failed. Defaults to an empty string.
-   * @param string $group
-   *   (optional) The group this message belongs to. Defaults to 'Other'.
+   *
+   * @internal
    */
-  protected function assertNormalized($haystack, $needle, $message = '', $group = 'Other') {
-    $this->assertTrue(strpos(strtolower(Html::decodeEntities($haystack)), $needle) !== FALSE, $message, $group);
+  protected function assertNormalized(string $haystack, string $needle, string $message = ''): void {
+    $this->assertStringContainsString($needle, strtolower(Html::decodeEntities($haystack)), $message);
   }
 
   /**
    * Asserts that text transformed to lowercase with HTML entities decoded does not contain a given string.
    *
    * Otherwise fails the test with a given message, similar to all the
-   * SimpleTest assert* functions.
+   * PHPUnit assert* functions.
    *
    * Note that this does not remove nulls, new lines, and other character that
    * could be used to obscure a tag or an attribute name.
@@ -612,11 +644,11 @@ class XssTest extends TestCase {
    *   Lowercase, plain text to look for.
    * @param string $message
    *   (optional) Message to display if failed. Defaults to an empty string.
-   * @param string $group
-   *   (optional) The group this message belongs to. Defaults to 'Other'.
+   *
+   * @internal
    */
-  protected function assertNotNormalized($haystack, $needle, $message = '', $group = 'Other') {
-    $this->assertTrue(strpos(strtolower(Html::decodeEntities($haystack)), $needle) === FALSE, $message, $group);
+  protected function assertNotNormalized(string $haystack, string $needle, string $message = ''): void {
+    $this->assertStringNotContainsString($needle, strtolower(Html::decodeEntities($haystack)), $message);
   }
 
 }

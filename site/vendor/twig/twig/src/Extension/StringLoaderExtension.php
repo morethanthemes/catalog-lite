@@ -12,30 +12,20 @@
 namespace Twig\Extension {
 use Twig\TwigFunction;
 
-/**
- * @final
- */
-class StringLoaderExtension extends AbstractExtension
+final class StringLoaderExtension extends AbstractExtension
 {
-    public function getFunctions()
+    public function getFunctions(): array
     {
         return [
             new TwigFunction('template_from_string', 'twig_template_from_string', ['needs_environment' => true]),
         ];
     }
-
-    public function getName()
-    {
-        return 'string_loader';
-    }
 }
-
-class_alias('Twig\Extension\StringLoaderExtension', 'Twig_Extension_StringLoader');
 }
 
 namespace {
 use Twig\Environment;
-use Twig\Template;
+use Twig\TemplateWrapper;
 
 /**
  * Loads a template from a string.
@@ -43,11 +33,10 @@ use Twig\Template;
  *     {{ include(template_from_string("Hello {{ name }}")) }}
  *
  * @param string $template A template as a string or object implementing __toString()
- *
- * @return Template
+ * @param string $name     An optional name of the template to be used in error messages
  */
-function twig_template_from_string(Environment $env, $template)
+function twig_template_from_string(Environment $env, $template, string $name = null): TemplateWrapper
 {
-    return $env->createTemplate((string) $template);
+    return $env->createTemplate((string) $template, $name);
 }
 }

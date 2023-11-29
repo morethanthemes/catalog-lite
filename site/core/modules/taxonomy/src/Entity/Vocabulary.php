@@ -31,6 +31,7 @@ use Drupal\taxonomy\VocabularyInterface;
  *     },
  *     "route_provider" = {
  *       "html" = "Drupal\taxonomy\Entity\Routing\VocabularyRouteProvider",
+ *       "permissions" = "Drupal\user\Entity\EntityPermissionsRouteProvider",
  *     }
  *   },
  *   admin_permission = "administer taxonomy",
@@ -47,6 +48,7 @@ use Drupal\taxonomy\VocabularyInterface;
  *     "reset-form" = "/admin/structure/taxonomy/manage/{taxonomy_vocabulary}/reset",
  *     "overview-form" = "/admin/structure/taxonomy/manage/{taxonomy_vocabulary}/overview",
  *     "edit-form" = "/admin/structure/taxonomy/manage/{taxonomy_vocabulary}",
+ *     "entity-permissions-form" = "/admin/structure/taxonomy/manage/{taxonomy_vocabulary}/overview/permissions",
  *     "collection" = "/admin/structure/taxonomy",
  *   },
  *   config_export = {
@@ -90,23 +92,6 @@ class Vocabulary extends ConfigEntityBundleBase implements VocabularyInterface {
   /**
    * {@inheritdoc}
    */
-  public function getHierarchy() {
-    @trigger_error('\Drupal\taxonomy\VocabularyInterface::getHierarchy() is deprecated in Drupal 8.7.x and will be removed before Drupal 9.0.x. Use \Drupal\taxonomy\TermStorage::getVocabularyHierarchyType() instead.', E_USER_DEPRECATED);
-    return $this->entityTypeManager()->getStorage('taxonomy_term')->getVocabularyHierarchyType($this->id());
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setHierarchy($hierarchy) {
-    @trigger_error('\Drupal\taxonomy\VocabularyInterface::setHierarchy() is deprecated in Drupal 8.7.x and will be removed before Drupal 9.0.x. Reset the cache of the taxonomy_term storage controller instead.', E_USER_DEPRECATED);
-    $this->entityTypeManager()->getStorage('taxonomy_term')->resetCache();
-    return $this;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function id() {
     return $this->vid;
   }
@@ -125,7 +110,9 @@ class Vocabulary extends ConfigEntityBundleBase implements VocabularyInterface {
     parent::preDelete($storage, $entities);
 
     // Only load terms without a parent, child terms will get deleted too.
-    entity_delete_multiple('taxonomy_term', $storage->getToplevelTids(array_keys($entities)));
+    $term_storage = \Drupal::entityTypeManager()->getStorage('taxonomy_term');
+    $terms = $term_storage->loadMultiple($storage->getToplevelTids(array_keys($entities)));
+    $term_storage->delete($terms);
   }
 
   /**
@@ -147,7 +134,7 @@ class Vocabulary extends ConfigEntityBundleBase implements VocabularyInterface {
     }
     // Load all Taxonomy module fields and delete those which use only this
     // vocabulary.
-    $field_storages = entity_load_multiple_by_properties('field_storage_config', ['module' => 'taxonomy']);
+    $field_storages = \Drupal::entityTypeManager()->getStorage('field_storage_config')->loadByProperties(['module' => 'taxonomy']);
     foreach ($field_storages as $field_storage) {
       $modified_storage = FALSE;
       // Term reference fields may reference terms from more than one

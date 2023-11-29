@@ -79,7 +79,7 @@ class LoggerChannel implements LoggerChannelInterface {
   protected $currentUser;
 
   /**
-   * Constructs a LoggerChannel object
+   * Constructs a LoggerChannel object.
    *
    * @param string $channel
    *   The channel name for this instance.
@@ -91,7 +91,7 @@ class LoggerChannel implements LoggerChannelInterface {
   /**
    * {@inheritdoc}
    */
-  public function log($level, $message, array $context = []) {
+  public function log($level, string|\Stringable $message, array $context = []): void {
     if ($this->callDepth == self::MAX_CALL_DEPTH) {
       return;
     }
@@ -111,7 +111,7 @@ class LoggerChannel implements LoggerChannelInterface {
     if ($this->requestStack && $request = $this->requestStack->getCurrentRequest()) {
       $context['request_uri'] = $request->getUri();
       $context['referer'] = $request->headers->get('Referer', '');
-      $context['ip'] = $request->getClientIP();
+      $context['ip'] = $request->getClientIP() ?: '';
 
       if ($this->currentUser) {
         $context['uid'] = $this->currentUser->id();
@@ -165,13 +165,8 @@ class LoggerChannel implements LoggerChannelInterface {
    *   An array of sorted loggers by priority.
    */
   protected function sortLoggers() {
-    $sorted = [];
     krsort($this->loggers);
-
-    foreach ($this->loggers as $loggers) {
-      $sorted = array_merge($sorted, $loggers);
-    }
-    return $sorted;
+    return array_merge(...$this->loggers);
   }
 
 }

@@ -50,7 +50,9 @@ class FieldDefinitionTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
+    parent::setUp();
+
     $this->fieldType = $this->randomMachineName();
     $this->fieldTypeDefinition = [
       'id' => $this->fieldType,
@@ -205,7 +207,7 @@ class FieldDefinitionTest extends UnitTestCase {
       ->getMock();
     $data_definition->expects($this->any())
       ->method('getClass')
-      ->will($this->returnValue('Drupal\Core\Field\FieldItemBase'));
+      ->willReturn('Drupal\Core\Field\FieldItemBase');
     $definition->setItemDefinition($data_definition);
 
     // Set default value only with a literal.
@@ -270,7 +272,7 @@ class FieldDefinitionTest extends UnitTestCase {
    */
   public function testDefaultValueCallback($factory_name) {
     $definition = $this->initializeFieldUsingFactory($factory_name);
-    $callback = get_class($this) . '::mockDefaultValueCallback';
+    $callback = static::class . '::mockDefaultValueCallback';
     // setDefaultValueCallback returns $this.
     $this->assertSame($definition, $definition->setDefaultValueCallback($callback));
     $this->assertSame($callback, $definition->getDefaultValueCallback());
@@ -285,8 +287,8 @@ class FieldDefinitionTest extends UnitTestCase {
   public function testInvalidDefaultValueCallback($factory_name) {
     $definition = $this->initializeFieldUsingFactory($factory_name);
     // setDefaultValueCallback returns $this.
-    $this->setExpectedException(\InvalidArgumentException::class);
-    $definition->setDefaultValueCallback([get_class($this), 'mockDefaultValueCallback']);
+    $this->expectException(\InvalidArgumentException::class);
+    $definition->setDefaultValueCallback([static::class, 'mockDefaultValueCallback']);
   }
 
   /**
@@ -299,7 +301,7 @@ class FieldDefinitionTest extends UnitTestCase {
     $definition = $this->initializeFieldUsingFactory($factory_name);
     // setDefaultValueCallback returns $this.
     $this->assertSame($definition, $definition->setDefaultValueCallback(NULL));
-    $this->assertSame(NULL, $definition->getDefaultValueCallback());
+    $this->assertNull($definition->getDefaultValueCallback());
   }
 
   /**
@@ -385,6 +387,7 @@ class FieldDefinitionTest extends UnitTestCase {
         $definition->setFieldStorageDefinition($this->storageDefinition);
         return $definition;
     }
+    throw new \InvalidArgumentException("Invalid factory name '$factory_name' passed to " . __METHOD__);
   }
 
 }

@@ -28,6 +28,11 @@ class EntityTestDateonlyTest extends EntityTestResourceTestBase {
   protected static $dateString = '2017-03-01';
 
   /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
+
+  /**
    * Datetime test field name.
    *
    * @var string
@@ -37,12 +42,12 @@ class EntityTestDateonlyTest extends EntityTestResourceTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['datetime', 'entity_test'];
+  protected static $modules = ['datetime', 'entity_test'];
 
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     // Add datetime field.
@@ -112,7 +117,7 @@ class EntityTestDateonlyTest extends EntityTestResourceTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function assertNormalizationEdgeCases($method, Url $url, array $request_options) {
+  protected function assertNormalizationEdgeCases($method, Url $url, array $request_options): void {
     parent::assertNormalizationEdgeCases($method, $url, $request_options);
 
     if ($this->entity->getEntityType()->hasKey('bundle')) {

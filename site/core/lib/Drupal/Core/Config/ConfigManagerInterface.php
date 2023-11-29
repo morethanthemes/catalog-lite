@@ -30,18 +30,6 @@ interface ConfigManagerInterface {
   public function loadConfigEntityByName($name);
 
   /**
-   * Gets the entity manager.
-   *
-   * @return \Drupal\Core\Entity\EntityManagerInterface
-   *   The entity manager.
-   *
-   * @deprecated in Drupal 8.7.x, will be removed before Drupal 9.0.0. Use
-   *   \Drupal\Core\Config\ConfigManagerInterface::getEntityTypeManager()
-   *   instead.
-   */
-  public function getEntityManager();
-
-  /**
    * Gets the entity type manager.
    *
    * @return \Drupal\Core\Entity\EntityTypeManagerInterface
@@ -126,7 +114,7 @@ interface ConfigManagerInterface {
    * @return \Drupal\Core\Config\Entity\ConfigEntityDependency[]
    *   An array of configuration entity dependency objects.
    */
-  public function findConfigEntityDependents($type, array $names);
+  public function findConfigEntityDependencies($type, array $names);
 
   /**
    * Finds config entities that are dependent on extensions or entities.
@@ -142,7 +130,7 @@ interface ConfigManagerInterface {
    * @return \Drupal\Core\Config\Entity\ConfigEntityInterface[]
    *   An array of dependencies as configuration entities.
    */
-  public function findConfigEntityDependentsAsEntities($type, array $names);
+  public function findConfigEntityDependenciesAsEntities($type, array $names);
 
   /**
    * Lists which config entities to update and delete on removal of a dependency.

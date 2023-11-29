@@ -9,7 +9,7 @@ use Drupal\Core\Database\Connection;
 /**
  * Defines the database flood backend. This is the default Drupal backend.
  */
-class DatabaseBackend implements FloodInterface {
+class DatabaseBackend implements FloodInterface, PrefixFloodInterface {
 
   /**
    * The database table name.
@@ -67,7 +67,7 @@ class DatabaseBackend implements FloodInterface {
   }
 
   /**
-   * Inserts an event into the flood table
+   * Inserts an event into the flood table.
    *
    * @param string $name
    *   The name of an event.
@@ -110,6 +110,21 @@ class DatabaseBackend implements FloodInterface {
   /**
    * {@inheritdoc}
    */
+  public function clearByPrefix(string $name, string $prefix): void {
+    try {
+      $this->connection->delete(static::TABLE_NAME)
+        ->condition('event', $name)
+        ->condition('identifier', $prefix . '-%', 'LIKE')
+        ->execute();
+    }
+    catch (\Exception $e) {
+      $this->catchException($e);
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function isAllowed($name, $threshold, $window = 3600, $identifier = NULL) {
     if (!isset($identifier)) {
       $identifier = $this->requestStack->getCurrentRequest()->getClientIp();
@@ -135,7 +150,7 @@ class DatabaseBackend implements FloodInterface {
    */
   public function garbageCollection() {
     try {
-      $return = $this->connection->delete(static::TABLE_NAME)
+      $this->connection->delete(static::TABLE_NAME)
         ->condition('expiration', REQUEST_TIME, '<')
         ->execute();
     }
@@ -150,19 +165,18 @@ class DatabaseBackend implements FloodInterface {
   protected function ensureTableExists() {
     try {
       $database_schema = $this->connection->schema();
-      if (!$database_schema->tableExists(static::TABLE_NAME)) {
-        $schema_definition = $this->schemaDefinition();
-        $database_schema->createTable(static::TABLE_NAME, $schema_definition);
-        return TRUE;
-      }
+      $schema_definition = $this->schemaDefinition();
+      $database_schema->createTable(static::TABLE_NAME, $schema_definition);
     }
     // If another process has already created the table, attempting to create
     // it will throw an exception. In this case just catch the exception and do
     // nothing.
     catch (DatabaseException $e) {
-      return TRUE;
     }
-    return FALSE;
+    catch (\Exception $e) {
+      return FALSE;
+    }
+    return TRUE;
   }
 
   /**
@@ -216,12 +230,14 @@ class DatabaseBackend implements FloodInterface {
           'type' => 'int',
           'not null' => TRUE,
           'default' => 0,
+          'size' => 'big',
         ],
         'expiration' => [
           'description' => 'Expiration timestamp. Expired events are purged on cron run.',
           'type' => 'int',
           'not null' => TRUE,
           'default' => 0,
+          'size' => 'big',
         ],
       ],
       'primary key' => ['fid'],

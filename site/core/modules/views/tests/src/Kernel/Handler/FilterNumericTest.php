@@ -9,10 +9,11 @@ use Drupal\views\Views;
  * Tests the numeric filter handler.
  *
  * @group views
+ * @group #slow
  */
 class FilterNumericTest extends ViewsKernelTestBase {
 
-  public static $modules = ['system'];
+  protected static $modules = ['system'];
 
   /**
    * Views used by this test.
@@ -75,7 +76,6 @@ class FilterNumericTest extends ViewsKernelTestBase {
     $view->setDisplay('page_1');
     $view->displayHandlers->get('page_1')->overrideOption('filters', $filters);
     $view->save();
-    $this->container->get('router.builder')->rebuild();
 
     $this->executeView($view);
     $resultset = [
@@ -200,7 +200,6 @@ class FilterNumericTest extends ViewsKernelTestBase {
     $view->setDisplay('page_1');
     $view->displayHandlers->get('page_1')->overrideOption('filters', $filters);
     $view->save();
-    $this->container->get('router.builder')->rebuild();
 
     $this->executeView($view);
     $resultset = [
@@ -230,7 +229,6 @@ class FilterNumericTest extends ViewsKernelTestBase {
     $view->setDisplay('page_1');
     $view->displayHandlers->get('page_1')->overrideOption('filters', $filters);
     $view->save();
-    $this->container->get('router.builder')->rebuild();
 
     $this->executeView($view);
     $resultset = [
@@ -278,8 +276,9 @@ class FilterNumericTest extends ViewsKernelTestBase {
   }
 
   /**
-   * Tests the numeric filter handler with the 'regular_expression' operator
-   * to grouped exposed filters.
+   * Tests the "numeric" filter with grouped exposed filters.
+   *
+   * The tests are performed with the 'regular_expression' operator.
    */
   public function testFilterNumericExposedGroupedRegularExpression() {
     $filters = $this->getGroupedExposedFilters();
@@ -341,7 +340,7 @@ class FilterNumericTest extends ViewsKernelTestBase {
 
     $this->executeView($view);
     $resultset = [
-    [
+      [
         'name' => 'John',
         'age' => 25,
       ],
@@ -375,7 +374,6 @@ class FilterNumericTest extends ViewsKernelTestBase {
     $view->setDisplay('page_1');
     $view->displayHandlers->get('page_1')->overrideOption('filters', $filters);
     $view->save();
-    $this->container->get('router.builder')->rebuild();
 
     $this->executeView($view);
     $resultset = [];
@@ -392,11 +390,10 @@ class FilterNumericTest extends ViewsKernelTestBase {
     $view->setDisplay('page_1');
     $view->displayHandlers->get('page_1')->overrideOption('filters', $filters);
     $view->save();
-    $this->container->get('router.builder')->rebuild();
 
     $this->executeView($view);
     $resultset = [
-    [
+      [
         'name' => 'John',
         'age' => 25,
       ],

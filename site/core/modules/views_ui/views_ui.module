@@ -5,6 +5,7 @@
  * Provide structure for the administrative interface to Views.
  */
 
+use Drupal\Component\Utility\Xss;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Url;
 use Drupal\views\ViewExecutable;
@@ -36,7 +37,7 @@ function views_ui_help($route_name, RouteMatchInterface $route_match) {
  * Implements hook_entity_type_build().
  */
 function views_ui_entity_type_build(array &$entity_types) {
-  /** @var $entity_types \Drupal\Core\Entity\EntityTypeInterface[] */
+  /** @var \Drupal\Core\Entity\EntityTypeInterface[] $entity_types */
   $entity_types['view']
     ->setFormClass('edit', 'Drupal\views_ui\ViewEditForm')
     ->setFormClass('add', 'Drupal\views_ui\ViewAddForm')
@@ -135,6 +136,7 @@ function views_ui_preprocess_views_view(&$variables) {
   if (!empty($view->live_preview)) {
     $variables['title'] = [
       '#markup' => $view->getTitle(),
+      '#allowed_tags' => Xss::getHtmlTagList(),
     ];
   }
 
@@ -316,15 +318,14 @@ function views_ui_views_analyze(ViewExecutable $view) {
   if (count($view->displayHandlers) < 2) {
     $ret[] = Analyzer::formatMessage(t('This view has only a default display and therefore will not be placed anywhere on your site; perhaps you want to add a page or a block display.'), 'warning');
   }
-  // You can give a page display the same path as an alias existing in the
-  // system, so the alias will not work anymore. Report this to the user,
-  // because he probably wanted something else.
+  // If a display has a path, check that it does not match an existing path
+  // alias. This results in the path alias not working.
   foreach ($view->displayHandlers as $display) {
     if (empty($display)) {
       continue;
     }
     if ($display->hasPath() && $path = $display->getOption('path')) {
-      $normal_path = \Drupal::service('path.alias_manager')->getPathByAlias($path);
+      $normal_path = \Drupal::service('path_alias.manager')->getPathByAlias($path);
       if ($path != $normal_path) {
         $ret[] = Analyzer::formatMessage(t('You have configured display %display with a path which is an path alias as well. This might lead to unwanted effects so better use an internal path.', ['%display' => $display->display['display_title']]), 'warning');
       }

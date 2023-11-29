@@ -4,6 +4,7 @@ namespace Drupal\Tests\jsonapi\Functional;
 
 use Drupal\comment\Entity\Comment;
 use Drupal\comment\Entity\CommentType;
+use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
@@ -20,6 +21,7 @@ use GuzzleHttp\RequestOptions;
  * JSON:API integration test for the "Comment" content entity type.
  *
  * @group jsonapi
+ * @group #slow
  */
 class CommentTest extends ResourceTestBase {
 
@@ -29,7 +31,7 @@ class CommentTest extends ResourceTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['comment', 'entity_test'];
+  protected static $modules = ['comment', 'entity_test'];
 
   /**
    * {@inheritdoc}
@@ -40,6 +42,11 @@ class CommentTest extends ResourceTestBase {
    * {@inheritdoc}
    */
   protected static $resourceTypeName = 'comment--comment';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -65,6 +72,11 @@ class CommentTest extends ResourceTestBase {
    * @var \Drupal\comment\CommentInterface
    */
   protected $entity;
+
+  /**
+   * @var \Drupal\entity_test\Entity\EntityTest
+   */
+  private $commentedEntity;
 
   /**
    * {@inheritdoc}
@@ -101,11 +113,12 @@ class CommentTest extends ResourceTestBase {
     $this->addDefaultCommentField('entity_test', 'bar', 'comment');
 
     // Create a "Camelids" test entity that the comment will be assigned to.
-    $commented_entity = EntityTest::create([
+    $this->commentedEntity = EntityTest::create([
       'name' => 'Camelids',
       'type' => 'bar',
+      'comment' => CommentItemInterface::OPEN,
     ]);
-    $commented_entity->save();
+    $this->commentedEntity->save();
 
     // Create a "Llama" comment.
     $comment = Comment::create([
@@ -113,7 +126,7 @@ class CommentTest extends ResourceTestBase {
         'value' => 'The name "llama" was adopted by European settlers from native Peruvians.',
         'format' => 'plain_text',
       ],
-      'entity_id' => $commented_entity->id(),
+      'entity_id' => $this->commentedEntity->id(),
       'entity_type' => 'entity_test',
       'field_name' => 'comment',
     ]);
@@ -168,12 +181,15 @@ class CommentTest extends ResourceTestBase {
           'status' => TRUE,
           'subject' => 'Llama',
           'thread' => '01/',
-          'drupal_internal__cid' => 1,
+          'drupal_internal__cid' => (int) $this->entity->id(),
         ],
         'relationships' => [
           'uid' => [
             'data' => [
               'id' => $author->uuid(),
+              'meta' => [
+                'drupal_internal__target_id' => (int) $author->id(),
+              ],
               'type' => 'user--user',
             ],
             'links' => [
@@ -184,6 +200,9 @@ class CommentTest extends ResourceTestBase {
           'comment_type' => [
             'data' => [
               'id' => CommentType::load('comment')->uuid(),
+              'meta' => [
+                'drupal_internal__target_id' => 'comment',
+              ],
               'type' => 'comment_type--comment_type',
             ],
             'links' => [
@@ -193,7 +212,10 @@ class CommentTest extends ResourceTestBase {
           ],
           'entity_id' => [
             'data' => [
-              'id' => EntityTest::load(1)->uuid(),
+              'id' => $this->commentedEntity->uuid(),
+              'meta' => [
+                'drupal_internal__target_id' => (int) $this->commentedEntity->id(),
+              ],
               'type' => 'entity_test--bar',
             ],
             'links' => [
@@ -233,6 +255,9 @@ class CommentTest extends ResourceTestBase {
           'entity_id' => [
             'data' => [
               'type' => 'entity_test--bar',
+              'meta' => [
+                'drupal_internal__target_id' => 1,
+              ],
               'id' => EntityTest::load(1)->uuid(),
             ],
           ],
@@ -323,12 +348,7 @@ class CommentTest extends ResourceTestBase {
       $this->assertResourceErrorResponse(422, 'entity_id: This value should not be null.', NULL, $response, '/data/attributes/entity_id');
     }
     catch (\Exception $e) {
-      if (version_compare(phpversion(), '7.0') >= 0) {
-        $this->assertSame("Error: Call to a member function get() on null\nDrupal\\comment\\Plugin\\Validation\\Constraint\\CommentNameConstraintValidator->getAnonymousContactDetailsSetting()() (Line: 96)\n", $e->getMessage());
-      }
-      else {
-        $this->assertSame(500, $response->getStatusCode());
-      }
+      $this->assertSame("Error: Call to a member function get() on null\nDrupal\\comment\\Plugin\\Validation\\Constraint\\CommentNameConstraintValidator->getAnonymousContactDetailsSetting()() (Line: 96)\n", $e->getMessage());
     }
 
     // DX: 422 when missing 'field_name' field.
@@ -386,13 +406,6 @@ class CommentTest extends ResourceTestBase {
     // comment access also depends on access to the commented entity type.
     \Drupal::entityTypeManager()->getAccessControlHandler('entity_test')->resetCache();
     return parent::entityAccess($entity, $operation, $account);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function testRelated() {
-    $this->markTestSkipped('Remove this in https://www.drupal.org/project/jsonapi/issues/2940339');
   }
 
   /**

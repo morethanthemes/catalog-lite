@@ -5,6 +5,8 @@
  * Module install file.
  */
 
+use Drupal\Core\Url;
+
 /**
  * Implements hook_install().
  */
@@ -58,17 +60,25 @@ function jsonapi_requirements($phase) {
         ':jsonapi-docs' => 'https://www.drupal.org/docs/8/modules/jsonapi/revisions',
       ]),
     ];
-
+    $requirements['jsonapi_read_only_mode'] = [
+      'title' => t('JSON:API allowed operations'),
+      'value' => t('Read-only'),
+      'severity' => REQUIREMENT_INFO,
+    ];
+    if (!\Drupal::configFactory()->get('jsonapi.settings')->get('read_only')) {
+      $requirements['jsonapi_read_only_mode']['value'] = t('All (create, read, update, delete)');
+      $requirements['jsonapi_read_only_mode']['description'] = t('It is recommended to <a href=":configure-url">configure</a> JSON:API to only accept all operations if the site requires it. <a href=":docs">Learn more about securing your site with JSON:API.</a>', [
+        ':docs' => 'https://www.drupal.org/docs/8/modules/jsonapi/security-considerations',
+        ':configure-url' => Url::fromRoute('jsonapi.settings')->toString(),
+      ]);
+    }
   }
   return $requirements;
 }
 
 /**
- * Enable BC: default the new read-only mode to "off" on existing sites.
+ * Implements hook_update_last_removed().
  */
-function jsonapi_update_8701() {
-  $config_factory = \Drupal::configFactory();
-  $jsonapi_settings = $config_factory->getEditable('jsonapi.settings');
-  $jsonapi_settings->set('read_only', FALSE)
-    ->save(TRUE);
+function jsonapi_update_last_removed() {
+  return 9401;
 }

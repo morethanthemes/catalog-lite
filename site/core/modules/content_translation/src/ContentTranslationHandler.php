@@ -78,8 +78,9 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
   protected $currentUser;
 
   /**
-   * The array of installed field storage definitions for the entity type, keyed
-   * by field name.
+   * Installed field storage definitions for the entity type.
+   *
+   * Keyed by field name.
    *
    * @var \Drupal\Core\Field\FieldStorageDefinitionInterface[]
    */
@@ -116,18 +117,16 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
    *   The messenger service.
    * @param \Drupal\Core\Datetime\DateFormatterInterface $date_formatter
    *   The date formatter service.
+   * @param \Drupal\Core\Entity\EntityLastInstalledSchemaRepositoryInterface $entity_last_installed_schema_repository
+   *   The installed entity definition repository service.
    */
-  public function __construct(EntityTypeInterface $entity_type, LanguageManagerInterface $language_manager, ContentTranslationManagerInterface $manager, EntityTypeManagerInterface $entity_type_manager, AccountInterface $current_user, MessengerInterface $messenger, DateFormatterInterface $date_formatter, EntityLastInstalledSchemaRepositoryInterface $entity_last_installed_schema_repository = NULL) {
+  public function __construct(EntityTypeInterface $entity_type, LanguageManagerInterface $language_manager, ContentTranslationManagerInterface $manager, EntityTypeManagerInterface $entity_type_manager, AccountInterface $current_user, MessengerInterface $messenger, DateFormatterInterface $date_formatter, EntityLastInstalledSchemaRepositoryInterface $entity_last_installed_schema_repository) {
     $this->entityTypeId = $entity_type->id();
     $this->entityType = $entity_type;
     $this->languageManager = $language_manager;
     $this->manager = $manager;
     $this->entityTypeManager = $entity_type_manager;
     $this->currentUser = $current_user;
-    if (!$entity_last_installed_schema_repository) {
-      @trigger_error('Calling ContentTranslationHandler::__construct() with the $entity_last_installed_schema_repository argument is supported in drupal:8.7.0 and will be required before drupal:9.0.0. See https://www.drupal.org/node/2549139.', E_USER_DEPRECATED);
-      $entity_last_installed_schema_repository = \Drupal::service('entity.last_installed_schema.repository');
-    }
     $this->fieldStorageDefinitions = $entity_last_installed_schema_repository->getLastInstalledFieldStorageDefinitions($this->entityTypeId);
     $this->messenger = $messenger;
     $this->dateFormatter = $date_formatter;
@@ -178,7 +177,7 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
         ->setSetting('target_type', 'user')
         ->setSetting('handler', 'default')
         ->setRevisionable(TRUE)
-        ->setDefaultValueCallback(get_class($this) . '::getDefaultOwnerId')
+        ->setDefaultValueCallback(static::class . '::getDefaultOwnerId')
         ->setTranslatable(TRUE);
     }
 
@@ -295,7 +294,11 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
     if (!$this->currentUser->hasPermission('translate any entity') && $permission_granularity = $entity_type->getPermissionGranularity()) {
       $translate_permission = $this->currentUser->hasPermission($permission_granularity == 'bundle' ? "translate {$entity->bundle()} {$entity->getEntityTypeId()}" : "translate {$entity->getEntityTypeId()}");
     }
-    return AccessResult::allowedIf($translate_permission && $this->currentUser->hasPermission("$op content translations"))->cachePerPermissions();
+    $access = AccessResult::allowedIf(($translate_permission && $this->currentUser->hasPermission("$op content translations")))->cachePerPermissions();
+    if (!$access->isAllowed()) {
+      return AccessResult::allowedIfHasPermission($this->currentUser, 'translate editable entities')->andIf($entity->access('update', $this->currentUser, TRUE));
+    }
+    return $access;
   }
 
   /**
@@ -314,18 +317,18 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
   public function entityFormAlter(array &$form, FormStateInterface $form_state, EntityInterface $entity) {
     /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
 
+    $metadata = $this->manager->getTranslationMetadata($entity);
     $form_object = $form_state->getFormObject();
     $form_langcode = $form_object->getFormLangcode($form_state);
     $entity_langcode = $entity->getUntranslated()->language()->getId();
-    $source_langcode = $this->getSourceLangcode($form_state);
 
-    $new_translation = !empty($source_langcode);
+    $new_translation = $entity->isNewTranslation();
     $translations = $entity->getTranslationLanguages();
     if ($new_translation) {
       // Make sure a new translation does not appear as existing yet.
       unset($translations[$form_langcode]);
     }
-    $is_translation = !$form_object->isDefaultFormLangcode($form_state);
+    $is_translation = $new_translation || ($entity->language()->getId() != $entity_langcode);
     $has_translations = count($translations) > 1;
 
     // Adjust page title to specify the current language being edited, if we
@@ -336,7 +339,7 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
       // When editing the original values display just the entity label.
       if ($is_translation) {
         $t_args = ['%language' => $languages[$form_langcode]->getName(), '%title' => $entity->label(), '@title' => $title];
-        $title = empty($source_langcode) ? t('@title [%language translation]', $t_args) : t('Create %language translation of %title', $t_args);
+        $title = $new_translation ? t('Create %language translation of %title', $t_args) : t('@title [%language translation]', $t_args);
       }
       $form['#title'] = $title;
     }
@@ -344,6 +347,7 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
     // Display source language selector only if we are creating a new
     // translation and there are at least two translations available.
     if ($has_translations && $new_translation) {
+      $source_langcode = $metadata->getSource();
       $form['source_langcode'] = [
         '#type' => 'details',
         '#title' => t('Source language: @language', ['@language' => $languages[$source_langcode]->getName()]),
@@ -435,7 +439,7 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
         '#title' => t('Translation'),
         '#tree' => TRUE,
         '#weight' => 10,
-        '#access' => $this->getTranslationAccess($entity, $source_langcode ? 'create' : 'update')->isAllowed(),
+        '#access' => $this->getTranslationAccess($entity, $new_translation ? 'create' : 'update')->isAllowed(),
         '#multilingual' => TRUE,
       ];
 
@@ -450,7 +454,6 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
       }
 
       // A new translation is enabled by default.
-      $metadata = $this->manager->getTranslationMetadata($entity);
       $status = $new_translation || $metadata->isPublished();
       // If there is only one published translation we cannot unpublish it,
       // since there would be nothing left to display.
@@ -566,7 +569,7 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
     // @todo Find a more reliable way to determine if a form element concerns a
     //   multilingual value.
     if (!isset($ignored_types)) {
-      $ignored_types = array_flip(['actions', 'value', 'hidden', 'vertical_tabs', 'token', 'details']);
+      $ignored_types = array_flip(['actions', 'value', 'hidden', 'vertical_tabs', 'token', 'details', 'link']);
     }
 
     /** @var \Drupal\Core\Entity\ContentEntityForm $form_object */
@@ -650,7 +653,7 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
     // If the current element does not have a (valid) title, try child elements.
     elseif ($children = Element::children($element)) {
       foreach ($children as $delta) {
-        $this->addTranslatabilityClue($element[$delta], $suffix);
+        $this->addTranslatabilityClue($element[$delta]);
       }
     }
     // If there are no children, fall back to the current #title attribute if it
@@ -667,6 +670,10 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
    *   The type of the entity.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity whose form is being built.
+   * @param array $form
+   *   A nested array form elements comprising the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    *
    * @see \Drupal\content_translation\ContentTranslationHandler::entityFormAlter()
    */
@@ -679,11 +686,6 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
     $metadata->setAuthor(!empty($values['uid']) ? User::load($values['uid']) : User::load(0));
     $metadata->setPublished(!empty($values['status']));
     $metadata->setCreatedTime(!empty($values['created']) ? strtotime($values['created']) : REQUEST_TIME);
-
-    $source_langcode = $this->getSourceLangcode($form_state);
-    if ($source_langcode) {
-      $metadata->setSource($source_langcode);
-    }
 
     $metadata->setOutdated(!empty($values['outdated']));
     if (!empty($values['retranslate'])) {
@@ -763,7 +765,7 @@ class ContentTranslationHandler implements ContentTranslationHandlerInterface, E
     $form_object = $form_state->getFormObject();
     $entity = $form_object->getEntity();
     if (count($entity->getTranslationLanguages()) > 1) {
-      $this->messenger->addWarning(t('This will delete all the translations of %label.', ['%label' => $entity->label()]));
+      $this->messenger->addWarning(t('This will delete all the translations of %label.', ['%label' => $entity->label() ?? $entity->id()]));
     }
   }
 

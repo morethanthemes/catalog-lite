@@ -10,12 +10,17 @@ use Drupal\image\Entity\ImageStyle;
  *
  * @group jsonapi
  */
-class ImageStyleTest extends ResourceTestBase {
+class ImageStyleTest extends ConfigEntityResourceTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['image'];
+  protected static $modules = ['image'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * {@inheritdoc}
@@ -125,6 +130,7 @@ class ImageStyleTest extends ResourceTestBase {
    */
   protected function getPostDocument() {
     // @todo Update in https://www.drupal.org/node/2300677.
+    return [];
   }
 
 }

@@ -11,7 +11,7 @@ use Drupal\taxonomy\Entity\Term;
 /**
  * Implements hook_install().
  */
-function forum_install() {
+function forum_install($is_syncing) {
   // Set the weight of the forum.module to 1 so it is loaded after the taxonomy.module.
   module_set_weight('forum', 1);
   // Do not allow to delete the forum's node type machine name.
@@ -19,7 +19,7 @@ function forum_install() {
   $locked['forum'] = 'forum';
   \Drupal::state()->set('node.type.locked', $locked);
 
-  if (!\Drupal::service('config.installer')->isSyncing()) {
+  if (!$is_syncing) {
     // Create a default forum so forum posts can be created.
     $term = Term::create([
       'name' => t('General discussion'),
@@ -120,11 +120,11 @@ function forum_schema() {
         'default' => '',
       ],
       'tid' => [
-         'description' => 'The term ID.',
-         'type' => 'int',
-         'unsigned' => TRUE,
-         'not null' => TRUE,
-         'default' => 0,
+        'description' => 'The term ID.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
       ],
       'sticky' => [
         'description' => 'Boolean indicating whether the node is sticky.',
@@ -139,12 +139,14 @@ function forum_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
+        'size' => 'big',
       ],
       'last_comment_timestamp' => [
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
         'description' => 'The Unix timestamp of the last comment that was posted within this node, from {comment}.timestamp.',
+        'size' => 'big',
       ],
       'comment_count' => [
         'type' => 'int',
@@ -174,4 +176,31 @@ function forum_schema() {
   ];
 
   return $schema;
+}
+
+/**
+ * Remove the year 2038 date limitation.
+ */
+function forum_update_10100(&$sandbox = NULL) {
+  $connection = \Drupal::database();
+  if ($connection->schema()->tableExists('forum_index') && $connection->databaseType() != 'sqlite') {
+    $new = [
+      'description' => 'The Unix timestamp when the node was created.',
+      'type' => 'int',
+      'unsigned' => TRUE,
+      'not null' => TRUE,
+      'default' => 0,
+      'size' => 'big',
+    ];
+    $connection->schema()->changeField('forum_index', 'created', 'created', $new);
+
+    $new = [
+      'type' => 'int',
+      'not null' => TRUE,
+      'default' => 0,
+      'description' => 'The Unix timestamp of the last comment that was posted within this node, from {comment}.timestamp.',
+      'size' => 'big',
+    ];
+    $connection->schema()->changeField('forum_index', 'last_comment_timestamp', 'last_comment_timestamp', $new);
+  }
 }

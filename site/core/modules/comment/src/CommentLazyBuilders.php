@@ -3,11 +3,12 @@
 namespace Drupal\comment;
 
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
-use Drupal\Core\DependencyInjection\DeprecatedServicePropertyTrait;
 use Drupal\Core\Entity\EntityFormBuilderInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Render\Element\Link;
+use Drupal\Core\Security\TrustedCallbackInterface;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
@@ -15,13 +16,7 @@ use Drupal\Core\Url;
 /**
  * Defines a service for comment #lazy_builder callbacks.
  */
-class CommentLazyBuilders {
-  use DeprecatedServicePropertyTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $deprecatedProperties = ['entityManager' => 'entity.manager'];
+class CommentLazyBuilders implements TrustedCallbackInterface {
 
   /**
    * The entity type manager service.
@@ -135,16 +130,16 @@ class CommentLazyBuilders {
   public function renderLinks($comment_entity_id, $view_mode, $langcode, $is_in_preview) {
     $links = [
       '#theme' => 'links__comment',
-      '#pre_render' => ['drupal_pre_render_links'],
+      '#pre_render' => [[Link::class, 'preRenderLinks']],
       '#attributes' => ['class' => ['links', 'inline']],
     ];
 
     if (!$is_in_preview) {
       /** @var \Drupal\comment\CommentInterface $entity */
       $entity = $this->entityTypeManager->getStorage('comment')->load($comment_entity_id);
-      $commented_entity = $entity->getCommentedEntity();
-
-      $links['comment'] = $this->buildLinks($entity, $commented_entity);
+      if ($commented_entity = $entity->getCommentedEntity()) {
+        $links['comment'] = $this->buildLinks($entity, $commented_entity);
+      }
 
       // Allow other modules to alter the comment links.
       $hook_context = [
@@ -186,7 +181,9 @@ class CommentLazyBuilders {
           'url' => $entity->toUrl('edit-form'),
         ];
       }
-      if ($entity->access('create')) {
+      $field_definition = $commented_entity->getFieldDefinition($entity->getFieldName());
+      if ($entity->access('create')
+        && $field_definition->getSetting('default_mode') === CommentManagerInterface::COMMENT_MODE_THREADED) {
         $links['comment-reply'] = [
           'title' => t('Reply'),
           'url' => Url::fromRoute('comment.reply', [
@@ -229,6 +226,13 @@ class CommentLazyBuilders {
    */
   protected function access(EntityInterface $entity) {
     return content_translation_translate_access($entity);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function trustedCallbacks() {
+    return ['renderLinks', 'renderForm'];
   }
 
 }

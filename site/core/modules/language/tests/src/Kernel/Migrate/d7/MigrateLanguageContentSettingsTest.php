@@ -6,7 +6,9 @@ use Drupal\language\Entity\ContentLanguageSettings;
 use Drupal\Tests\migrate_drupal\Kernel\d7\MigrateDrupal7TestBase;
 
 /**
- * Tests migration of language content setting variables,
+ * Tests the migration of language-related settings.
+ *
+ * Settings tested include the language content setting variables,
  * language_content_type_$type, i18n_node_options_* and i18n_lock_node_*.
  *
  * @group migrate_drupal_7
@@ -16,16 +18,25 @@ class MigrateLanguageContentSettingsTest extends MigrateDrupal7TestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['node', 'text', 'language', 'content_translation', 'menu_ui'];
+  protected static $modules = [
+    'node',
+    'text',
+    'language',
+    'content_translation',
+    'menu_ui',
+  ];
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->migrateContentTypes();
-    $this->executeMigration('d7_language_content_settings');
+    $this->executeMigrations([
+      'language',
+      'd7_language_content_settings',
+    ]);
   }
 
   /**
@@ -53,7 +64,7 @@ class MigrateLanguageContentSettingsTest extends MigrateDrupal7TestBase {
     $this->assertSame($config->getDefaultLangcode(), 'site_default');
 
     // Make sure there's no migration exceptions.
-    $messages = $this->migration->getIdMap()->getMessageIterator()->fetchAll();
+    $messages = $this->migration->getIdMap()->getMessages()->fetchAll();
     $this->assertEmpty($messages);
 
     // Assert that a content type translatable with entity_translation is still

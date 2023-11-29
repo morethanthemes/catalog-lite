@@ -4,7 +4,7 @@ namespace Drupal\Tests\taxonomy\Kernel\Views;
 
 use Drupal\Core\Link;
 use Drupal\Core\Render\RenderContext;
-use Drupal\Tests\taxonomy\Functional\TaxonomyTestTrait;
+use Drupal\Tests\taxonomy\Traits\TaxonomyTestTrait;
 use Drupal\Tests\views\Kernel\ViewsKernelTestBase;
 use Drupal\views\Tests\ViewTestData;
 use Drupal\views\Views;
@@ -21,7 +21,12 @@ class TaxonomyFieldTidTest extends ViewsKernelTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['taxonomy', 'taxonomy_test_views', 'text', 'filter'];
+  protected static $modules = [
+    'taxonomy',
+    'taxonomy_test_views',
+    'text',
+    'filter',
+  ];
 
   /**
    * {@inheritdoc}
@@ -38,7 +43,7 @@ class TaxonomyFieldTidTest extends ViewsKernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp($import_test_views = TRUE) {
+  protected function setUp($import_test_views = TRUE): void {
     parent::setUp($import_test_views);
 
     $this->installEntitySchema('taxonomy_term');
@@ -48,7 +53,7 @@ class TaxonomyFieldTidTest extends ViewsKernelTestBase {
     $vocabulary = $this->createVocabulary();
     $this->term1 = $this->createTerm($vocabulary);
 
-    ViewTestData::createTestViews(get_class($this), ['taxonomy_test_views']);
+    ViewTestData::createTestViews(static::class, ['taxonomy_test_views']);
   }
 
   /**

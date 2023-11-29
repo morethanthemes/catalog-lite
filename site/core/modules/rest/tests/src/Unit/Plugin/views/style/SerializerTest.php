@@ -18,21 +18,21 @@ class SerializerTest extends UnitTestCase {
   /**
    * The View instance.
    *
-   * @var \Drupal\views\ViewExecutable|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\views\ViewExecutable|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $view;
 
   /**
    * The RestExport display handler.
    *
-   * @var \Drupal\rest\Plugin\views\display\RestExport|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\rest\Plugin\views\display\RestExport|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $displayHandler;
 
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->view = $this->getMockBuilder(ViewExecutable::class)
@@ -65,7 +65,7 @@ class SerializerTest extends UnitTestCase {
     $mock_serializer->serialize([], 'json', Argument::that(function ($argument) {
       return isset($argument['views_style_plugin']) && $argument['views_style_plugin'] instanceof Serializer;
     }))
-      ->willReturn()
+      ->willReturn('')
       ->shouldBeCalled();
 
     $view_serializer_style = new Serializer([], 'dummy_serializer', [], $mock_serializer->reveal(), ['json', 'xml'], ['json' => 'serialization', 'xml' => 'serialization']);

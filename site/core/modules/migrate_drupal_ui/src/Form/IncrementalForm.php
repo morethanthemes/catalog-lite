@@ -2,10 +2,12 @@
 
 namespace Drupal\migrate_drupal_ui\Form;
 
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Datetime\DateFormatterInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
+use Drupal\migrate\Plugin\MigrationPluginManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -14,13 +16,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * @internal
  */
 class IncrementalForm extends MigrateUpgradeFormBase {
-
-  /**
-   * The state service.
-   *
-   * @var \Drupal\Core\State\StateInterface
-   */
-  protected $state;
 
   /**
    * The date formatter service.
@@ -37,11 +32,14 @@ class IncrementalForm extends MigrateUpgradeFormBase {
    * @param \Drupal\Core\Datetime\DateFormatterInterface $date_formatter
    *   The date formatter service.
    * @param \Drupal\Core\TempStore\PrivateTempStoreFactory $tempstore_private
-   *   The private temp store factory.
+   *   The private tempstore factory service.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
+   *   The config factory service.
+   * @param \Drupal\migrate\Plugin\MigrationPluginManagerInterface $migration_plugin_manager
+   *   The migration plugin manager service.
    */
-  public function __construct(StateInterface $state, DateFormatterInterface $date_formatter, PrivateTempStoreFactory $tempstore_private) {
-    parent::__construct($tempstore_private);
-    $this->state = $state;
+  public function __construct(StateInterface $state, DateFormatterInterface $date_formatter, PrivateTempStoreFactory $tempstore_private, ConfigFactoryInterface $config_factory, MigrationPluginManagerInterface $migration_plugin_manager) {
+    parent::__construct($config_factory, $migration_plugin_manager, $state, $tempstore_private);
     $this->dateFormatter = $date_formatter;
   }
 
@@ -52,7 +50,9 @@ class IncrementalForm extends MigrateUpgradeFormBase {
     return new static(
       $container->get('state'),
       $container->get('date.formatter'),
-      $container->get('tempstore.private')
+      $container->get('tempstore.private'),
+      $container->get('config.factory'),
+      $container->get('plugin.manager.migration')
     );
   }
 
@@ -82,7 +82,10 @@ class IncrementalForm extends MigrateUpgradeFormBase {
     //   https://www.drupal.org/node/2687849
     $form['upgrade_option_item'] = [
       '#type' => 'item',
-      '#prefix' => $this->t('An upgrade has already been performed on this site. To perform a new migration, create a clean and empty new install of Drupal 8. Rollbacks are not yet supported through the user interface. For more information, see the <a href=":url">upgrading handbook</a>.', [':url' => 'https://www.drupal.org/upgrade/migrate']),
+      '#prefix' => $this->t('An upgrade has already been performed on this site. To perform a new migration, create a clean and empty new install of Drupal @version. Rollbacks are not yet supported through the user interface. For more information, see the <a href=":url">upgrading handbook</a>.', [
+        '@version' => $this->destinationSiteVersion,
+        ':url' => 'https://www.drupal.org/upgrade/migrate',
+      ]),
       '#description' => $this->t('Last upgrade: @date', ['@date' => $this->dateFormatter->format($date_performed)]),
     ];
     return $form;
